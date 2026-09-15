@@ -1,39 +1,40 @@
 # ═══════════════════════════════════════════════════════════════════
-# CIPHER ULTRA v13.0 — Python Edition (Clean)
+# CIPHER ULTRA v13 — NEVER STOP | RENDER EDITION
+# 5 Accounts | جمع → بيع → إرسال | كل 5 دقائق | لا يتوقف
 # ═══════════════════════════════════════════════════════════════════
 
 import os
 import sys
 import time
+import json
 import random
 import hashlib
 import uuid
 import threading
 import requests
-from datetime import datetime as dt, timezone
-from flask import Flask, jsonify, render_template_string
+import traceback
+from datetime import datetime as dt
+from flask import Flask, jsonify
 
-CFG = {
-    "API": "https://qjwbfkpudysxqtkeouwu.supabase.co",
-    "KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFqd2Jma3B1ZHlzeHF0a2VvdXd1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk3NDEyNDksImV4cCI6MjA5NTMxNzI0OX0.rs4NXx8bMPQ3k8Zgf_F3efeDPuAsxPlqS0bZ3cFE9dI",
-    "CV": "fish-market-v20260626-force-update-1",
-    "MAX_RETRIES": 15,
-    "RETRY_BASE_MS": 2000,
-    "TOKEN_REFRESH_MARGIN": 300,
-    "CYCLE_MIN": 240,
-    "CYCLE_MAX": 600,
-    "SHIP_THRESHOLD": 95,
-    "STOCK_SELL_PCT": 90,
-    "PRICE_SELL_PCT": 85,
-    "DEFAULT_FISH": "poseidon",
-}
+# ═══════════════════════════════════════════════════════════════════
+# CONFIG
+# ═══════════════════════════════════════════════════════════════════
+API = "https://qjwbfkpudysxqtkeouwu.supabase.co"
+KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFqd2Jma3B1ZHlzeHF0a2VvdXd1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk3NDEyNDksImV4cCI6MjA5NTMxNzI0OX0.rs4NXx8bMPQ3k8Zgf_F3efeDPuAsxPlqS0bZ3cFE9dI"
+CV = "fish-market-v20260626-force-update-1"
 
-ACCOUNTS_CONFIG = []
-for i in range(1, 13):
-    email = os.environ.get("ACC%d_EMAIL" % i)
-    password = os.environ.get("ACC%d_PASS" % i)
-    if email and password:
-        ACCOUNTS_CONFIG.append({"email": email, "password": password})
+CYCLE_SECONDS = 300
+STAGGER = 3
+
+# ═══════════════════════════════════════════════════════════════════
+# 5 حسابات من Environment Variables
+# ═══════════════════════════════════════════════════════════════════
+ACCOUNTS = []
+for i in range(1, 6):
+    e = os.environ.get("ACC" + str(i) + "_EMAIL")
+    p = os.environ.get("ACC" + str(i) + "_PASS")
+    if e and p:
+        ACCOUNTS.append({"email": e, "password": p})
 
 USER_AGENTS = [
     "Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.6.1 Mobile/15E148 Safari/604.1",
@@ -42,555 +43,333 @@ USER_AGENTS = [
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.1 Safari/605.1.15",
 ]
 CLIENT_INFO = ["supabase-js-web/2.106.1", "supabase-js-web/2.105.4", "supabase-js-web/2.104.0"]
-ORIGIN = "https://www.molok-alqarasna.com"
-REFERER = "https://www.molok-alqarasna.com/"
 
-SHIP_SEC = {
-    "ship-lvl-1": 60, "ship-lvl-2": 90, "ship-lvl-3": 120,
-    "ship-lvl-5": 600, "ship-lvl-7": 1200, "ship-lvl-10": 1800,
-    "ship-lvl-12": 2400, "ship-lvl-19": 3000, "ship-lvl-25": 2520,
-    "ship-lvl-28": 3120, "ship-lvl-29": 3420, "ship-lvl-30": 3600,
-    "royal-whale": 3000, "upgrade-sub": 3000,
-}
+LOG_LOCK = threading.Lock()
+GLOBAL_STATS_LOCK = threading.Lock()
 
-
-class Logger:
-    def __init__(self):
-        self.history = []
-        self.max_history = 500
-        self.lock = threading.Lock()
-
-    def log(self, msg, type="i", acc=""):
-        entry = {"t": dt.now().isoformat(), "msg": msg, "type": type, "acc": acc}
-        with self.lock:
-            self.history.append(entry)
-            if len(self.history) > self.max_history:
-                self.history.pop(0)
-        ts = dt.now().strftime("%H:%M:%S")
-        prefix = "[" + ts + "]"
-        if acc:
-            prefix += "[" + acc[:6] + "]"
-        icons = {"i": "*", "s": "OK", "w": "!", "e": "X", "g": ">>"}
-        print(prefix + " " + icons.get(type, "*") + " " + msg)
-        sys.stdout.flush()
-
-    def get(self, limit=100):
-        with self.lock:
-            return self.history[-limit:]
-
-
-LOG = Logger()
-
-GLOBAL_STATE = {
+GLOBAL = {
     "started_at": time.time(),
     "total_cycles": 0,
     "total_collected": 0,
     "total_sold": 0,
     "total_gold": 0,
-    "lock": threading.Lock(),
+    "accounts_ref": [],
+    "logs": [],
 }
 
 
-def parse_iso_safe(s):
-    if not s:
-        return None
-    try:
-        s = s.replace("Z", "+00:00")
-        if s.endswith("+00:00"):
-            s = s[:-6]
-        if "." in s:
-            b, f = s.split(".")
-            s = b + "." + f[:6].ljust(6, "0")
-        else:
-            s = s + ".000000"
-        return dt.strptime(s, "%Y-%m-%dT%H:%M:%S.%f").replace(tzinfo=timezone.utc)
-    except Exception:
-        return None
+def log(msg, acc="", tag=""):
+    ts = dt.now().strftime("%H:%M:%S")
+    p = "[" + ts + "]"
+    if acc:
+        p += "[" + acc[:6] + "]"
+    if tag:
+        p += " " + tag
+    with LOG_LOCK:
+        try:
+            print(p + " " + msg)
+            sys.stdout.flush()
+        except Exception:
+            pass
+        GLOBAL["logs"].append({"t": time.time(), "msg": msg, "acc": acc, "tag": tag})
+        if len(GLOBAL["logs"]) > 300:
+            GLOBAL["logs"].pop(0)
 
 
-class UltraAccount:
+# ═══════════════════════════════════════════════════════════════════
+# ACCOUNT
+# ═══════════════════════════════════════════════════════════════════
+class Account:
     def __init__(self, email, password, index):
         self.email = email
         self.password = password
         self.index = index
         self.short = email[:6]
         self.token = None
-        self.refresh_token = None
+        self.refresh = None
         self.uid = None
         self.expires_at = 0
-        self.paused_until = 0
-        self.stats = {"collected": 0, "sold": 0, "gold": 0, "cycles": 0, "errors": 0}
-        self.state = "idle"
         self.ua = random.choice(USER_AGENTS)
-        self.client = random.choice(CLIENT_INFO)
-        self.device_id = hashlib.sha256(("%s-%s" % (uuid.uuid4(), time.time())).encode()).hexdigest()
-        self.hdid = hashlib.md5(("%s-%s" % (uuid.uuid4(), random.random())).encode()).hexdigest()
-        self.session = requests.Session()
+        self.cli = random.choice(CLIENT_INFO)
+        self.dev = hashlib.sha256(str(uuid.uuid4()).encode()).hexdigest()
+        self.hdid = hashlib.md5(str(uuid.uuid4()).encode()).hexdigest()
+        self.s = requests.Session()
+        self.stats = {"collected": 0, "sold": 0, "gold": 0, "cycles": 0, "errors": 0}
+        self.login_fails = 0
+        self.state = "idle"
 
-    def _headers(self):
-        h = {
-            "apikey": CFG["KEY"],
+    def h(self):
+        hh = {
+            "apikey": KEY,
             "Content-Type": "application/json",
-            "Accept": "application/json, text/plain, */*",
-            "Accept-Language": "ar-SA,ar;q=0.9,en-US;q=0.8,en;q=0.7",
+            "Accept": "application/json",
+            "Accept-Language": "ar-SA,ar;q=0.9,en-US;q=0.8",
             "User-Agent": self.ua,
-            "Origin": ORIGIN,
-            "Referer": REFERER,
-            "X-Client-Info": self.client,
-            "X-Supabase-Api-Version": "2024-01-01",
-            "X-Device-Id": self.device_id,
+            "Origin": "https://www.molok-alqarasna.com",
+            "Referer": "https://www.molok-alqarasna.com/",
+            "X-Client-Info": self.cli,
+            "X-Device-Id": self.dev,
             "X-Hamor-Hdid": self.hdid,
             "Cache-Control": "no-cache",
-            "Pragma": "no-cache",
-            "DNT": "1",
         }
         if self.token:
-            h["Authorization"] = "Bearer " + self.token
-        return h
-
-    def _delay(self, action="read"):
-        delays = {"read": (0.3, 1.2), "click": (0.5, 2.0), "think": (1.5, 4.0)}
-        lo, hi = delays.get(action, (0.5, 1.5))
-        time.sleep(random.uniform(lo, hi))
+            hh["Authorization"] = "Bearer " + self.token
+        return hh
 
     def login(self):
-        for attempt in range(3):
-            try:
-                self._delay("read")
-                r = self.session.post(
-                    CFG["API"] + "/auth/v1/token?grant_type=password",
-                    headers={"apikey": CFG["KEY"], "Content-Type": "application/json", "User-Agent": self.ua},
-                    json={"email": self.email, "password": self.password},
-                    timeout=30
-                )
-                if r.status_code == 429:
-                    LOG.log("Rate Limit - wait 60s", "w", self.short)
-                    time.sleep(60)
-                    continue
-                if r.status_code != 200:
-                    LOG.log("Login fail: " + r.text[:60], "e", self.short)
-                    return False
-                d = r.json()
-                self.token = d["access_token"]
-                self.refresh_token = d["refresh_token"]
-                self.uid = d["user"]["id"]
-                self.expires_at = time.time() + d.get("expires_in", 3600) - 300
-                LOG.log("Logged in: " + self.uid[:8] + "...", "s", self.short)
-                self.state = "running"
-                return True
-            except Exception as e:
-                LOG.log("Login error: " + str(e), "e", self.short)
-                time.sleep(2)
-        return False
+        try:
+            time.sleep(random.uniform(0.3, 1.0))
+            r = self.s.post(
+                API + "/auth/v1/token?grant_type=password",
+                headers={"apikey": KEY, "Content-Type": "application/json", "User-Agent": self.ua},
+                json={"email": self.email, "password": self.password},
+                timeout=30
+            )
+            if r.status_code != 200:
+                self.login_fails += 1
+                log("login fail (" + str(self.login_fails) + "): " + r.text[:60], self.short, "ERR")
+                return False
+            d = r.json()
+            self.token = d["access_token"]
+            self.refresh = d["refresh_token"]
+            self.uid = d["user"]["id"]
+            self.expires_at = time.time() + d.get("expires_in", 3600) - 300
+            self.login_fails = 0
+            self.state = "running"
+            log("logged in: " + self.uid[:8], self.short, "OK")
+            return True
+        except Exception as e:
+            self.login_fails += 1
+            log("login err: " + str(e)[:60], self.short, "ERR")
+            return False
 
-    def ensure_fresh(self):
+    def ensure(self):
         if time.time() < self.expires_at:
             return True
         try:
-            r = self.session.post(
-                CFG["API"] + "/auth/v1/token?grant_type=refresh_token",
-                headers={"apikey": CFG["KEY"], "Content-Type": "application/json"},
-                json={"refresh_token": self.refresh_token},
+            r = self.s.post(
+                API + "/auth/v1/token?grant_type=refresh_token",
+                headers={"apikey": KEY, "Content-Type": "application/json"},
+                json={"refresh_token": self.refresh},
                 timeout=30
             )
             if r.status_code == 200:
                 d = r.json()
                 self.token = d["access_token"]
-                self.refresh_token = d["refresh_token"]
+                self.refresh = d["refresh_token"]
                 self.expires_at = time.time() + d.get("expires_in", 3600) - 300
-                LOG.log("Token refreshed", "s", self.short)
+                log("refreshed", self.short, "OK")
                 return True
-        except Exception as e:
-            LOG.log("Refresh error: " + str(e), "w", self.short)
+        except Exception:
+            pass
         return self.login()
 
-    def api(self, method, url, action="read", **kwargs):
-        if time.time() < self.paused_until:
-            return None
-        self._delay(action)
-        for i in range(CFG["MAX_RETRIES"]):
+    def api(self, method, url, **kw):
+        for i in range(5):
             try:
-                self.ensure_fresh()
-                r = self.session.request(method, url, headers=self._headers(), timeout=30, **kwargs)
-                if r.status_code in (200, 201):
+                self.ensure()
+                time.sleep(random.uniform(0.2, 0.8))
+                r = self.s.request(method, url, headers=self.h(), timeout=30, **kw)
+                if r.status_code in (200, 201, 204):
                     return r
-                if r.status_code == 429:
-                    wait = random.randint(15, 25)
-                    LOG.log("Rate limit - backoff " + str(wait) + "s", "w", self.short)
-                    time.sleep(wait)
-                    continue
-                if r.status_code == 403:
-                    time.sleep(random.uniform(3, 8))
-                    continue
                 if r.status_code == 401:
-                    LOG.log("401 - refreshing", "w", self.short)
-                    if self.ensure_fresh():
-                        time.sleep(random.uniform(2, 4))
-                        continue
-                    return None
+                    self.ensure()
+                    continue
+                if r.status_code == 429:
+                    log("rate limit — 15s", self.short, "WRN")
+                    time.sleep(15)
+                    continue
                 if r.status_code == 400:
                     return r
-            except Exception as e:
-                if i == CFG["MAX_RETRIES"] - 1:
-                    LOG.log("API failed: " + str(e), "e", self.short)
+            except Exception:
+                if i == 4:
                     return None
-                backoff = CFG["RETRY_BASE_MS"] / 1000.0 * (1.5 ** i) + random.uniform(0, 5)
-                time.sleep(min(backoff, 30))
+                time.sleep(2)
         return None
-
-    def get_ships(self):
-        url = (CFG["API"] + "/rest/v1/ships_owned?select=id,catalog_code,at_sea,"
-               "fishing_started_at,hp,max_hp,preferred_fish_id"
-               "&user_id=eq." + self.uid + "&in_storage=eq.false")
-        r = self.api("GET", url, "read")
-        if r and r.status_code == 200:
-            return r.json()
-        return []
-
-    def get_stock(self):
-        r = self.api("POST", CFG["API"] + "/rest/v1/rpc/get_fish_stock_summary", "read", json={})
-        if r and r.status_code == 200:
-            try:
-                return r.json()
-            except Exception:
-                return []
-        return []
-
-    def get_capacity(self):
-        r = self.api("POST", CFG["API"] + "/rest/v1/rpc/user_market_capacity", "read", json={"_uid": self.uid})
-        if r:
-            try:
-                return int(r.text)
-            except Exception:
-                return 0
-        return 0
-
-    def get_prices(self):
-        r = self.api("GET", CFG["API"] + "/rest/v1/fish_market_prices?select=fish_id,current_price,max_price", "read")
-        if r and r.status_code == 200:
-            try:
-                return {p["fish_id"]: p for p in r.json()}
-            except Exception:
-                return {}
-        return {}
-
-    def get_profile(self):
-        r = self.api("GET", CFG["API"] + "/rest/v1/profiles?id=eq." + self.uid + "&select=coins,gems,level", "read")
-        if r and r.status_code == 200:
-            try:
-                return r.json()[0]
-            except Exception:
-                return None
-        return None
-
-    def collect(self, ship_id, fish_id):
-        r = self.api("POST", CFG["API"] + "/rest/v1/rpc/collect_fishing_reward", "click",
-                     json={"_ship_id": ship_id, "_requested_fish_id": fish_id, "_client_progress": 5000})
-        return r is not None and r.status_code == 200
-
-    def return_ship(self, ship_id):
-        self.api("POST", CFG["API"] + "/rest/v1/rpc/set_ship_at_sea", "click",
-                 json={"_ship_id": ship_id, "_at_sea": False})
-
-    def send_ship(self, ship_id):
-        r = self.api("POST", CFG["API"] + "/rest/v1/rpc/set_ship_at_sea", "click",
-                     json={"_ship_id": ship_id, "_at_sea": True})
-        return r is not None and r.status_code == 200
-
-    def sell(self, fish_id, qty):
-        r = self.api("POST", CFG["API"] + "/rest/v1/rpc/sell_fish_by_qty", "click",
-                     json={"_fish_id": fish_id, "_qty": qty, "_client_version": CFG["CV"]})
-        if r and r.status_code == 200:
-            try:
-                return int(r.text)
-            except Exception:
-                return 0
-        return 0
-
-    def ship_pct(self, ship):
-        if not ship.get("at_sea") or not ship.get("fishing_started_at"):
-            return 0
-        started = parse_iso_safe(ship["fishing_started_at"])
-        if not started:
-            return 0
-        total = SHIP_SEC.get(ship["catalog_code"], 3000)
-        elapsed = (dt.now(timezone.utc) - started).total_seconds()
-        return min(100.0, max(0.0, elapsed / total * 100))
-
-    def stock_pct(self):
-        cap = self.get_capacity()
-        if cap <= 0:
-            return 0
-        stock = self.get_stock()
-        total = sum(x.get("qty", 0) for x in stock if x.get("qty", 0) > 0)
-        return min(100.0, total / cap * 100)
 
     def cycle(self):
-        if time.time() < self.paused_until:
-            return 0
         self.stats["cycles"] += 1
-        LOG.log("--- cycle #" + str(self.stats["cycles"]) + " ---", "g", self.short)
-        if not self.ensure_fresh():
-            return 0
+        log("─── cycle #" + str(self.stats["cycles"]) + " ───", self.short, "CYC")
 
-        spct_before = self.stock_pct()
-        LOG.log("stock before: " + str(round(spct_before, 1)) + "%", "i", self.short)
+        # 1) جمع
+        r = self.api("GET", API + "/rest/v1/ships_owned?"
+                     "select=id,catalog_code,at_sea,hp,max_hp,preferred_fish_id"
+                     "&user_id=eq." + self.uid + "&in_storage=eq.false")
+        ships = r.json() if r and r.status_code == 200 else []
+        at_sea = [s for s in ships if s.get("at_sea")]
+        at_port = [s for s in ships if not s.get("at_sea")]
+        log("ships: " + str(len(ships)) + " | sea: " + str(len(at_sea)) + " | port: " + str(len(at_port)), self.short)
 
-        if spct_before >= 90:
-            LOG.log("STOCK FULL - forced sell", "w", self.short)
-            stock = self.get_stock()
-            for item in stock:
-                fid = item.get("fish_id")
-                qty = item.get("qty", 0)
-                if qty <= 0:
-                    continue
-                earned = self.sell(fid, qty)
-                if earned > 0:
-                    self.stats["sold"] += qty
-                    self.stats["gold"] += earned
-            time.sleep(3)
+        collected = 0
+        for s in at_sea:
+            fish = s.get("preferred_fish_id") or "poseidon"
+            rr = self.api("POST", API + "/rest/v1/rpc/collect_fishing_reward",
+                          json={"_ship_id": s["id"], "_requested_fish_id": fish, "_client_progress": 5000})
+            if rr and rr.status_code == 200:
+                collected += 1
+                log("  ✓ collect " + s["catalog_code"], self.short, "OK")
+            self.api("POST", API + "/rest/v1/rpc/set_ship_at_sea",
+                     json={"_ship_id": s["id"], "_at_sea": False})
+            time.sleep(random.uniform(0.3, 1.0))
+        self.stats["collected"] += collected
 
-        ships = self.get_ships()
-        LOG.log("ships: " + str(len(ships)), "i", self.short)
-        ready = []
-        for s in ships:
-            pct = self.ship_pct(s)
-            status = "SEA" if s["at_sea"] else "PORT"
-            LOG.log("  " + s["catalog_code"] + " - " + str(round(pct, 1)) + "% " + status, "i", self.short)
-            if s["at_sea"] and pct >= CFG["SHIP_THRESHOLD"]:
-                ready.append(s)
-
-        if ready:
-            spct_now = self.stock_pct()
-            if spct_now >= 95:
-                LOG.log("stock near full - skip collect", "w", self.short)
-                for s in ready:
-                    self.return_ship(s["id"])
-            else:
-                LOG.log("collect from " + str(len(ready)) + " ships", "s", self.short)
-                for s in ready:
-                    fish_id = s.get("preferred_fish_id") or CFG["DEFAULT_FISH"]
-                    if self.collect(s["id"], fish_id):
-                        LOG.log("  OK " + s["catalog_code"], "s", self.short)
-                        self.stats["collected"] += 1
-                    self.return_ship(s["id"])
-
-        spct = self.stock_pct()
-        LOG.log("stock after: " + str(round(spct, 1)) + "%", "i", self.short)
-
-        stock = self.get_stock()
-        prices = self.get_prices()
+        # 2) بيع
+        r = self.api("POST", API + "/rest/v1/rpc/get_fish_stock_summary", json={})
+        stock = r.json() if r and r.status_code == 200 else []
+        sold = 0
         for item in stock:
             fid = item.get("fish_id")
             qty = item.get("qty", 0)
-            if qty <= 0 or fid not in prices:
+            if not fid or qty <= 0:
                 continue
-            p = prices[fid]
-            pp = p["current_price"] / p["max_price"] * 100 if p["max_price"] > 0 else 0
-            if spct >= 98 or spct >= CFG["STOCK_SELL_PCT"] or pp >= CFG["PRICE_SELL_PCT"]:
-                earned = self.sell(fid, qty)
-                if earned > 0:
-                    self.stats["sold"] += qty
-                    self.stats["gold"] += earned
+            rr = self.api("POST", API + "/rest/v1/rpc/sell_fish_by_qty",
+                          json={"_fish_id": fid, "_qty": qty, "_client_version": CV})
+            if rr and rr.status_code == 200:
+                sold += qty
+                log("  ✓ sell " + str(qty) + "x" + fid, self.short, "SELL")
+            time.sleep(random.uniform(0.3, 0.8))
+        self.stats["sold"] += sold
 
-        final_spct = self.stock_pct()
-        ships = self.get_ships()
+        # 3) إرسال
+        r = self.api("GET", API + "/rest/v1/ships_owned?"
+                     "select=id,catalog_code,at_sea,hp,max_hp"
+                     "&user_id=eq." + self.uid + "&in_storage=eq.false")
+        ships = r.json() if r and r.status_code == 200 else []
+        sent = 0
         for s in ships:
-            if s["at_sea"]:
+            if s.get("at_sea"):
                 continue
-            if s["hp"] <= s["max_hp"] * 0.3:
+            if s.get("hp", 0) <= s.get("max_hp", 1) * 0.3:
+                log("  skip " + s["catalog_code"] + " (HP)", self.short, "WRN")
                 continue
-            if final_spct >= 90:
-                continue
-            self.send_ship(s["id"])
+            rr = self.api("POST", API + "/rest/v1/rpc/set_ship_at_sea",
+                          json={"_ship_id": s["id"], "_at_sea": True})
+            if rr and rr.status_code == 200:
+                sent += 1
+                log("  → " + s["catalog_code"] + " SEA", self.short)
+            time.sleep(random.uniform(0.3, 1.0))
 
-        profile = self.get_profile()
-        if profile:
-            self.stats["gold"] = profile.get("coins", self.stats["gold"])
+        # 4) الذهب
+        r = self.api("GET", API + "/rest/v1/profiles?id=eq." + self.uid + "&select=coins")
+        if r and r.status_code == 200:
+            try:
+                self.stats["gold"] = r.json()[0].get("coins", 0)
+            except Exception:
+                pass
 
-        LOG.log("SUM: collected=" + str(self.stats["collected"]) + " sold=" + str(self.stats["sold"]) + " gold=" + str(self.stats["gold"]), "g", self.short)
-        return random.randint(CFG["CYCLE_MIN"], CFG["CYCLE_MAX"])
+        log("SUM: collected=" + str(collected) + " sold=" + str(sold)
+            + " sent=" + str(sent) + " gold=" + str(self.stats["gold"]), self.short, ">>")
+
+        with GLOBAL_STATS_LOCK:
+            GLOBAL["total_cycles"] += 1
+            GLOBAL["total_collected"] += collected
+            GLOBAL["total_sold"] += sold
+            GLOBAL["total_gold"] += self.stats["gold"]
 
 
-def account_worker(config, index):
-    initial_delay = index * 8 + random.randint(0, 5)
-    LOG.log("Account #" + str(index + 1) + " starts in " + str(initial_delay) + "s", "i", config["email"][:6])
-    time.sleep(initial_delay)
-    acc = UltraAccount(config["email"], config["password"], index)
-    if not acc.login():
-        LOG.log("Account #" + str(index + 1) + " failed", "e", config["email"][:6])
-        return
+# ═══════════════════════════════════════════════════════════════════
+# WORKER — لا يتوقف
+# ═══════════════════════════════════════════════════════════════════
+def worker(cfg, idx):
+    time.sleep(idx * STAGGER)
+    acc = Account(cfg["email"], cfg["password"], idx)
+    GLOBAL["accounts_ref"].append(acc)
+
+    # حلقة لا نهائية — ما تنكسر أبداً
     while True:
         try:
-            wait = acc.cycle()
-            if wait > 0:
-                LOG.log("wait " + str(wait) + "s (" + str(wait // 60) + "m)", "i", acc.short)
-                time.sleep(wait)
-            else:
-                time.sleep(120)
-            with GLOBAL_STATE["lock"]:
-                GLOBAL_STATE["total_cycles"] += 1
-                GLOBAL_STATE["total_collected"] += acc.stats["collected"]
-                GLOBAL_STATE["total_sold"] += acc.stats["sold"]
-                GLOBAL_STATE["total_gold"] += acc.stats["gold"]
+            if not acc.token:
+                if not acc.login():
+                    log("login failed — retry in 60s", acc.short, "ERR")
+                    time.sleep(60)
+                    continue
+
+            try:
+                acc.cycle()
+            except Exception as e:
+                acc.stats["errors"] += 1
+                log("cycle error: " + str(e)[:100], acc.short, "ERR")
+                traceback.print_exc()
+
+            log("wait " + str(CYCLE_SECONDS) + "s", acc.short)
+            rem = CYCLE_SECONDS
+            while rem > 0:
+                time.sleep(min(5, rem))
+                rem -= 5
+
         except KeyboardInterrupt:
-            break
+            return
         except Exception as e:
-            acc.stats["errors"] += 1
-            LOG.log("Worker error: " + str(e), "e", acc.short)
+            log("worker outer error: " + str(e)[:100], acc.short, "ERR")
+            traceback.print_exc()
             time.sleep(60)
 
 
+# ═══════════════════════════════════════════════════════════════════
+# FLASK
+# ═══════════════════════════════════════════════════════════════════
 app = Flask(__name__)
-WORKERS_REF = []
-
-
-DASHBOARD_HTML = """<!DOCTYPE html>
-<html lang="ar" dir="rtl">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>CIPHER ULTRA v13</title>
-<style>
-  *{box-sizing:border-box;margin:0;padding:0}
-  body{font-family:Cairo,system-ui,sans-serif;background:linear-gradient(180deg,#0a0a1a,#0d0d1f);color:#e8e8e8;padding:20px;min-height:100vh}
-  h1{text-align:center;font-size:26px;background:linear-gradient(135deg,#ff0050,#ff00ff);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:20px}
-  .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:20px}
-  .stat{background:linear-gradient(145deg,#1a1a2e,#0f0f1e);border:1px solid rgba(255,0,80,.3);border-radius:12px;padding:15px;text-align:center}
-  .stat-label{font-size:11px;color:#888;margin-bottom:5px}
-  .stat-val{font-size:22px;font-weight:800;color:#ff0050}
-  .stat-val.gold{color:#ffd700}
-  .stat-val.green{color:#00ff88}
-  .stat-val.blue{color:#00d4ff}
-  .acc-card{background:linear-gradient(145deg,#1a1a2e,#0f0f1e);border:1px solid rgba(255,0,80,.25);border-radius:12px;padding:14px;margin-bottom:10px}
-  .acc-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
-  .acc-name{font-weight:800;color:#ff0050;font-size:15px}
-  .acc-status{font-size:11px;padding:3px 10px;border-radius:12px;font-weight:700}
-  .acc-status.run{background:#00ff88;color:#000}
-  .acc-status.idle{background:#666;color:#fff}
-  .acc-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;font-size:11px}
-  .acc-stat{background:rgba(0,0,0,.3);padding:8px;border-radius:8px;text-align:center}
-  .acc-stat-label{color:#888;font-size:9px}
-  .acc-stat-val{color:#fff;font-weight:800;margin-top:3px}
-  .logs{background:rgba(0,0,0,.5);border-radius:10px;padding:12px;height:300px;overflow-y:auto;font-family:monospace;font-size:11px;line-height:1.5;margin-top:20px;border:1px solid rgba(255,0,80,.2)}
-  .log-line{padding:2px 0;display:flex;gap:8px}
-  .log-time{color:#555;min-width:60px}
-  .log-i .log-msg{color:#00d4ff}
-  .log-s .log-msg{color:#00ff88}
-  .log-w .log-msg{color:#ffaa00}
-  .log-e .log-msg{color:#ff4444}
-  .log-g .log-msg{color:#ff0050;font-weight:800}
-  .refresh{text-align:center;color:#666;font-size:11px;margin-top:20px}
-</style>
-</head>
-<body>
-  <h1>CIPHER ULTRA v13.0</h1>
-  <div class="stats" id="stats">
-    <div class="stat"><div class="stat-label">ACCOUNTS</div><div class="stat-val" id="s-acc">-</div></div>
-    <div class="stat"><div class="stat-label">CYCLES</div><div class="stat-val blue" id="s-cyc">-</div></div>
-    <div class="stat"><div class="stat-label">COLLECTED</div><div class="stat-val green" id="s-col">-</div></div>
-    <div class="stat"><div class="stat-label">SOLD</div><div class="stat-val" id="s-sol">-</div></div>
-    <div class="stat"><div class="stat-label">GOLD</div><div class="stat-val gold" id="s-gld">-</div></div>
-    <div class="stat"><div class="stat-label">UPTIME</div><div class="stat-val" id="s-upt">-</div></div>
-  </div>
-  <div id="accounts"></div>
-  <h2 style="font-size:16px;margin:20px 0 10px;color:#ff0050">Live Logs</h2>
-  <div class="logs" id="logs"></div>
-  <div class="refresh">auto-refresh every 10s</div>
-<script>
-async function load(){
-  try{
-    const r = await fetch('/api/status');
-    const d = await r.json();
-    document.getElementById('s-acc').textContent = d.total_accounts;
-    document.getElementById('s-cyc').textContent = d.total_cycles;
-    document.getElementById('s-col').textContent = d.total_collected;
-    document.getElementById('s-sol').textContent = d.total_sold;
-    document.getElementById('s-gld').textContent = d.total_gold.toLocaleString();
-    document.getElementById('s-upt').textContent = Math.floor(d.uptime/3600) + 'h';
-    document.getElementById('accounts').innerHTML = d.accounts.map(a => `
-      <div class="acc-card">
-        <div class="acc-head">
-          <div class="acc-name">${a.short}</div>
-          <div class="acc-status ${a.state === 'running' ? 'run' : 'idle'}">${a.state}</div>
-        </div>
-        <div class="acc-stats">
-          <div class="acc-stat"><div class="acc-stat-label">CYCLES</div><div class="acc-stat-val">${a.cycles}</div></div>
-          <div class="acc-stat"><div class="acc-stat-label">COLLECTED</div><div class="acc-stat-val">${a.collected}</div></div>
-          <div class="acc-stat"><div class="acc-stat-label">SOLD</div><div class="acc-stat-val">${a.sold}</div></div>
-          <div class="acc-stat"><div class="acc-stat-label">GOLD</div><div class="acc-stat-val">${a.gold.toLocaleString()}</div></div>
-        </div>
-      </div>
-    `).join('');
-    const lBox = document.getElementById('logs');
-    lBox.innerHTML = d.logs.map(l => `
-      <div class="log-line log-${l.type}">
-        <span class="log-time">${new Date(l.t).toLocaleTimeString('en-GB')}</span>
-        <span class="log-msg">${l.msg}</span>
-      </div>
-    `).join('');
-    lBox.scrollTop = lBox.scrollHeight;
-  }catch(e){console.error(e)}
-}
-load();
-setInterval(load, 10000);
-</script>
-</body>
-</html>"""
 
 
 @app.route("/")
-def dashboard():
-    return render_template_string(DASHBOARD_HTML)
-
-
-@app.route("/api/status")
-def api_status():
-    accounts = []
-    for w in WORKERS_REF:
-        if not hasattr(w, "acc"):
-            continue
-        a = w.acc
-        accounts.append({
-            "email": a.email, "short": a.short, "state": a.state,
-            "cycles": a.stats["cycles"], "collected": a.stats["collected"],
-            "sold": a.stats["sold"], "gold": a.stats["gold"], "errors": a.stats["errors"],
-        })
-    return jsonify({
-        "total_accounts": len(accounts),
-        "total_cycles": GLOBAL_STATE["total_cycles"],
-        "total_collected": GLOBAL_STATE["total_collected"],
-        "total_sold": GLOBAL_STATE["total_sold"],
-        "total_gold": GLOBAL_STATE["total_gold"],
-        "uptime": time.time() - GLOBAL_STATE["started_at"],
-        "accounts": accounts,
-        "logs": LOG.get(80),
-    })
+def root():
+    return "CIPHER ULTRA v13 - NEVER STOP - " + str(len(ACCOUNTS)) + " accounts", 200
 
 
 @app.route("/api/healthz")
 def healthz():
     return jsonify({
-        "status": "ok", "version": "13.0-ULTRA",
-        "accounts": len(ACCOUNTS_CONFIG),
-        "uptime": time.time() - GLOBAL_STATE["started_at"],
+        "status": "ok",
+        "version": "13.0-NEVER-STOP",
+        "accounts": len(ACCOUNTS),
+        "uptime": time.time() - GLOBAL["started_at"],
+        "total_cycles": GLOBAL["total_cycles"],
     }), 200
+
+
+@app.route("/api/status")
+def status():
+    with GLOBAL_STATS_LOCK:
+        accs = []
+        for a in GLOBAL["accounts_ref"]:
+            accs.append({
+                "short": a.short,
+                "state": a.state,
+                "cycles": a.stats["cycles"],
+                "collected": a.stats["collected"],
+                "sold": a.stats["sold"],
+                "gold": a.stats["gold"],
+                "errors": a.stats["errors"],
+            })
+        return jsonify({
+            "total_accounts": len(accs),
+            "total_cycles": GLOBAL["total_cycles"],
+            "total_collected": GLOBAL["total_collected"],
+            "total_sold": GLOBAL["total_sold"],
+            "total_gold": GLOBAL["total_gold"],
+            "uptime": time.time() - GLOBAL["started_at"],
+            "accounts": accs,
+            "logs": GLOBAL["logs"][-80:],
+        })
 
 
 if __name__ == "__main__":
     print("=" * 60)
-    print("CIPHER ULTRA v13.0 - PYTHON EDITION")
+    print("CIPHER ULTRA v13 — NEVER STOP (RENDER)")
     print("=" * 60)
-    print("Accounts: " + str(len(ACCOUNTS_CONFIG)))
-    print("Stealth: ARMED")
+    print("Accounts: " + str(len(ACCOUNTS)))
+    print("Cycle: " + str(CYCLE_SECONDS) + "s")
     print("=" * 60)
-    if not ACCOUNTS_CONFIG:
-        print("No accounts configured")
-        sys.exit(1)
-    for i, cfg in enumerate(ACCOUNTS_CONFIG):
-        t = threading.Thread(target=account_worker, args=(cfg, i), daemon=True)
+
+    if not ACCOUNTS:
+        print("WARNING: no accounts in env vars")
+        print("Set ACC1_EMAIL ... ACC5_EMAIL and ACC1_PASS ... ACC5_PASS")
+
+    for i, cfg in enumerate(ACCOUNTS):
+        t = threading.Thread(target=worker, args=(cfg, i), daemon=True)
         t.start()
-        time.sleep(0.5)
+        time.sleep(0.3)
+
     port = int(os.environ.get("PORT", 8080))
     print("Dashboard: http://0.0.0.0:" + str(port))
     app.run(host="0.0.0.0", port=port, use_reloader=False)
