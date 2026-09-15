@@ -1,7 +1,3 @@
-# ═══════════════════════════════════════════════════════════════════
-# CIPHER ULTRA v13 — NEVER STOP | RENDER EDITION
-# 5 Accounts | جمع → بيع → إرسال | كل 5 دقائق | لا يتوقف
-# ═══════════════════════════════════════════════════════════════════
 
 import os
 import sys
@@ -27,10 +23,10 @@ CYCLE_SECONDS = 300
 STAGGER = 3
 
 # ═══════════════════════════════════════════════════════════════════
-# 5 حسابات من Environment Variables
+# Load accounts from Environment Variables (ACC1 → ACC12)
 # ═══════════════════════════════════════════════════════════════════
 ACCOUNTS = []
-for i in range(1, 6):
+for i in range(1, 13):
     e = os.environ.get("ACC" + str(i) + "_EMAIL")
     p = os.environ.get("ACC" + str(i) + "_PASS")
     if e and p:
@@ -121,13 +117,15 @@ class Account:
             time.sleep(random.uniform(0.3, 1.0))
             r = self.s.post(
                 API + "/auth/v1/token?grant_type=password",
-                headers={"apikey": KEY, "Content-Type": "application/json", "User-Agent": self.ua},
+                headers={"apikey": KEY, "Content-Type": "application/json",
+                         "User-Agent": self.ua},
                 json={"email": self.email, "password": self.password},
                 timeout=30
             )
             if r.status_code != 200:
                 self.login_fails += 1
-                log("login fail (" + str(self.login_fails) + "): " + r.text[:60], self.short, "ERR")
+                log("login fail (" + str(self.login_fails) + "): " + r.text[:60],
+                    self.short, "ERR")
                 return False
             d = r.json()
             self.token = d["access_token"]
@@ -198,13 +196,16 @@ class Account:
         ships = r.json() if r and r.status_code == 200 else []
         at_sea = [s for s in ships if s.get("at_sea")]
         at_port = [s for s in ships if not s.get("at_sea")]
-        log("ships: " + str(len(ships)) + " | sea: " + str(len(at_sea)) + " | port: " + str(len(at_port)), self.short)
+        log("ships: " + str(len(ships)) + " | sea: " + str(len(at_sea))
+            + " | port: " + str(len(at_port)), self.short)
 
         collected = 0
         for s in at_sea:
             fish = s.get("preferred_fish_id") or "poseidon"
             rr = self.api("POST", API + "/rest/v1/rpc/collect_fishing_reward",
-                          json={"_ship_id": s["id"], "_requested_fish_id": fish, "_client_progress": 5000})
+                          json={"_ship_id": s["id"],
+                                "_requested_fish_id": fish,
+                                "_client_progress": 5000})
             if rr and rr.status_code == 200:
                 collected += 1
                 log("  ✓ collect " + s["catalog_code"], self.short, "OK")
@@ -223,7 +224,8 @@ class Account:
             if not fid or qty <= 0:
                 continue
             rr = self.api("POST", API + "/rest/v1/rpc/sell_fish_by_qty",
-                          json={"_fish_id": fid, "_qty": qty, "_client_version": CV})
+                          json={"_fish_id": fid, "_qty": qty,
+                                "_client_version": CV})
             if rr and rr.status_code == 200:
                 sold += qty
                 log("  ✓ sell " + str(qty) + "x" + fid, self.short, "SELL")
@@ -250,7 +252,8 @@ class Account:
             time.sleep(random.uniform(0.3, 1.0))
 
         # 4) الذهب
-        r = self.api("GET", API + "/rest/v1/profiles?id=eq." + self.uid + "&select=coins")
+        r = self.api("GET", API + "/rest/v1/profiles?id=eq."
+                     + self.uid + "&select=coins")
         if r and r.status_code == 200:
             try:
                 self.stats["gold"] = r.json()[0].get("coins", 0)
@@ -258,7 +261,8 @@ class Account:
                 pass
 
         log("SUM: collected=" + str(collected) + " sold=" + str(sold)
-            + " sent=" + str(sent) + " gold=" + str(self.stats["gold"]), self.short, ">>")
+            + " sent=" + str(sent) + " gold=" + str(self.stats["gold"]),
+            self.short, ">>")
 
         with GLOBAL_STATS_LOCK:
             GLOBAL["total_cycles"] += 1
@@ -268,14 +272,13 @@ class Account:
 
 
 # ═══════════════════════════════════════════════════════════════════
-# WORKER — لا يتوقف
+# WORKER — لا يتوقف أبداً
 # ═══════════════════════════════════════════════════════════════════
 def worker(cfg, idx):
     time.sleep(idx * STAGGER)
     acc = Account(cfg["email"], cfg["password"], idx)
     GLOBAL["accounts_ref"].append(acc)
 
-    # حلقة لا نهائية — ما تنكسر أبداً
     while True:
         try:
             if not acc.token:
@@ -357,13 +360,13 @@ if __name__ == "__main__":
     print("=" * 60)
     print("CIPHER ULTRA v13 — NEVER STOP (RENDER)")
     print("=" * 60)
-    print("Accounts: " + str(len(ACCOUNTS)))
+    print("Accounts loaded: " + str(len(ACCOUNTS)))
     print("Cycle: " + str(CYCLE_SECONDS) + "s")
     print("=" * 60)
 
     if not ACCOUNTS:
         print("WARNING: no accounts in env vars")
-        print("Set ACC1_EMAIL ... ACC5_EMAIL and ACC1_PASS ... ACC5_PASS")
+        print("Set ACC1_EMAIL ... ACC12_EMAIL and ACC1_PASS ... ACC12_PASS")
 
     for i, cfg in enumerate(ACCOUNTS):
         t = threading.Thread(target=worker, args=(cfg, i), daemon=True)
