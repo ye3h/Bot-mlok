@@ -17,7 +17,7 @@ def load_accounts():
             return accounts
         except Exception as e:
             print("[CONFIG] ACCOUNTS_JSON parse error: " + str(e))
-    for i in range(1, 21):
+    for i in range(1, 31):
         e = os.environ.get("ACC" + str(i) + "_EMAIL", "").strip()
         p = os.environ.get("ACC" + str(i) + "_PASS", "").strip()
         if e and p:
@@ -63,7 +63,7 @@ def log(msg, tag=""):
         print(line)
         sys.stdout.flush()
         LOG_LINES.append(line)
-        if len(LOG_LINES) > 200:
+        if len(LOG_LINES) > 300:
             LOG_LINES.pop(0)
 
 def bump(k, n=1):
@@ -345,7 +345,7 @@ class Acc:
 
     def collect_all(self):
         st, tx = self.get(
-            "ships_owned?select=id,catalog_code,at_sea,preferred_fish_id&user_id=eq." +
+            "ships_owned?select=id,catalog_code,at_sea,preferred_fish_id,hp,max_hp&user_id=eq." +
             self.uid + "&in_storage=eq.false&at_sea=eq.true"
         )
         if st != 200:
@@ -374,8 +374,11 @@ class Acc:
                         log("collect " + str(s.get("catalog_code")) + " " + str(qty) + "x" + fid, self.short)
                 except:
                     pass
-                self.rpc("set_ship_at_sea", {"_ship_id": s["id"], "_at_sea": False})
-            time.sleep(random.uniform(0.4, 0.9))
+                hp = s.get("hp") or 0
+                mx = s.get("max_hp") or 1
+                if hp / mx >= MIN_HP_PCT:
+                    self.rpc("set_ship_at_sea", {"_ship_id": s["id"], "_at_sea": True})
+            time.sleep(random.uniform(0.3, 0.6))
         bump("collected", collected)
         if total_fish:
             acc_bump(self.email, "fish", total_fish)
@@ -429,7 +432,7 @@ class Acc:
             st2, _ = self.rpc("set_ship_at_sea", {"_ship_id": s["id"], "_at_sea": True})
             if st2 in (200, 204):
                 sent += 1
-            time.sleep(random.uniform(0.4, 0.8))
+            time.sleep(random.uniform(0.3, 0.6))
         if sent:
             log("send " + str(sent) + " ships to sea", self.short)
         return sent
@@ -460,18 +463,6 @@ def main_worker(cfg, idx):
     acc.donate_tribe()
     log("main end", acc.short)
 
-def fish_worker(cfg, idx):
-    time.sleep(idx * 1.5)
-    acc = Acc(cfg, idx)
-    if not acc.login():
-        bump("login_fail")
-        return
-    c = acc.collect_all()
-    s = acc.sell_fish()
-    acc.send_ships_to_sea()
-    bump("fish_cycles")
-    log("fish collect=" + str(c) + " sold=" + str(s), acc.short)
-
 def run_main_cycle():
     log("=" * 40)
     log("MAIN CYCLE")
@@ -488,18 +479,51 @@ def run_main_cycle():
     with LOCK:
         STATS["last_main"] = time.time()
 
+def fish_cycle_collect(cfg, idx, accs):
+    time.sleep(idx * 1.5)
+    acc = Acc(cfg, idx)
+    accs[idx] = acc
+    if not acc.login():
+        bump("login_fail")
+        return
+    acc.collect_all()
+
+def fish_cycle_sell(idx, accs):
+    time.sleep(idx * 0.3)
+    acc = accs[idx]
+    if acc is None:
+        return
+    acc.sell_fish()
+    acc.send_ships_to_sea()
+
 def run_fish_cycle():
     log("=" * 40)
-    log("FISH CYCLE")
+    log("FISH CYCLE - PHASE 1: COLLECT + RETURN")
     log("=" * 40)
+
+    accs = [None] * len(ACCOUNTS)
     threads = []
     for i, cfg in enumerate(ACCOUNTS):
-        t = threading.Thread(target=fish_worker, args=(cfg, i))
+        t = threading.Thread(target=fish_cycle_collect, args=(cfg, i, accs))
         t.start()
         threads.append(t)
         time.sleep(0.3)
     for t in threads:
         t.join()
+
+    log("=" * 40)
+    log("FISH CYCLE - PHASE 2: SELL")
+    log("=" * 40)
+
+    threads = []
+    for i in range(len(ACCOUNTS)):
+        t = threading.Thread(target=fish_cycle_sell, args=(i, accs))
+        t.start()
+        threads.append(t)
+    for t in threads:
+        t.join()
+
+    bump("fish_cycles")
     with LOCK:
         STATS["last_fish"] = time.time()
 
@@ -549,7 +573,7 @@ def index():
     </style>
     </head>
     <body>
-    <h1>CIPHER CLOUD v1.0</h1>
+    <h1>CIPHER CLOUD v2.0</h1>
     <p style="color:#9ca3af;margin-bottom:20px;">Accounts: {{ acc_count }} | Uptime: {{ h }}h {{ m }}m</p>
     <div class="grid">
       <div class="card"><div class="label">Main Cycles</div><div class="value">{{ main_cycles }}</div></div>
@@ -589,7 +613,7 @@ def index():
         login_fail=STATS["login_fail"],
         fish_ago=fish_ago,
         main_ago=main_ago,
-        logs=LOG_LINES[-100:],
+        logs=LOG_LINES[-150:],
     )
 
 @app.route("/health")
