@@ -8,21 +8,12 @@ CV = "fish-market-v20260626-force-update-1"
 
 def load_accounts():
     accounts = []
-    j = os.environ.get("ACCOUNTS_JSON", "").strip()
-    if j:
-        try:
-            arr = json.loads(j)
-            accounts = [a for a in arr if a.get("email") and a.get("password")]
-            print("[CONFIG] Loaded " + str(len(accounts)) + " accounts from ACCOUNTS_JSON")
-            return accounts
-        except Exception as e:
-            print("[CONFIG] ACCOUNTS_JSON parse error: " + str(e))
     for i in range(1, 31):
         e = os.environ.get("ACC" + str(i) + "_EMAIL", "").strip()
         p = os.environ.get("ACC" + str(i) + "_PASS", "").strip()
         if e and p:
             accounts.append({"email": e, "password": p})
-    print("[CONFIG] Loaded " + str(len(accounts)) + " accounts from ACC*_EMAIL/PASS")
+    print("[CONFIG] Loaded " + str(len(accounts)) + " accounts")
     return accounts
 
 ACCOUNTS = load_accounts()
@@ -35,7 +26,11 @@ BUY_ROCKET_COUNT = int(os.environ.get("BUY_ROCKET_COUNT", "30"))
 BOSS_ATTACKS = int(os.environ.get("BOSS_ATTACKS", "5"))
 DONATE_AMOUNT = int(os.environ.get("DONATE_AMOUNT", "10000"))
 
-UA = "Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.7 Mobile/15E148 Safari/604.1"
+USER_AGENTS = [
+    "Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.7 Mobile/15E148 Safari/604.1",
+    "Mozilla/5.0 (iPhone; CPU iPhone OS 18_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.6 Mobile/15E148 Safari/604.1",
+    "Mozilla/5.0 (iPhone; CPU iPhone OS 17_7 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.7 Mobile/15E148 Safari/604.1",
+]
 
 LOCK = threading.Lock()
 STATS = {
@@ -73,17 +68,18 @@ def bump(k, n=1):
 def acc_bump(email, k, n=1):
     with LOCK:
         if email not in STATS["account_stats"]:
-            STATS["account_stats"][email] = {"gems": 0, "coins": 0, "fish": 0, "damage": 0, "errors": 0}
+            STATS["account_stats"][email] = {"gems": 0, "coins": 0, "fish": 0, "damage": 0}
         STATS["account_stats"][email][k] = STATS["account_stats"][email].get(k, 0) + n
 
 def riyadh_date():
-    return (dt.utcnow() + timedelta(hours=3)).strftime("%Y-%m-%d")
+    return (dt.now(dt.UTC) + timedelta(hours=3)).strftime("%Y-%m-%d")
 
 class Acc:
     def __init__(self, cfg, idx):
         self.email = cfg["email"]
         self.pw = cfg["password"]
         self.short = self.email.split("@")[0][-8:]
+        self.ua = random.choice(USER_AGENTS)
         self.token = None
         self.refresh = None
         self.uid = None
@@ -94,7 +90,8 @@ class Acc:
         h = {
             "apikey": KEY,
             "Accept": "application/json",
-            "User-Agent": UA,
+            "Accept-Language": "ar-SA,ar;q=0.9,en-US;q=0.8",
+            "User-Agent": self.ua,
             "Origin": "https://www.molok-alqarasna.com",
             "Referer": "https://www.molok-alqarasna.com/",
         }
@@ -107,9 +104,10 @@ class Acc:
     def login(self):
         for attempt in range(4):
             try:
+                time.sleep(random.uniform(0.3, 0.9))
                 r = self.s.post(
                     API + "/auth/v1/token?grant_type=password",
-                    headers={"apikey": KEY, "Content-Type": "application/json", "User-Agent": UA},
+                    headers={"apikey": KEY, "Content-Type": "application/json", "User-Agent": self.ua},
                     json={"email": self.email, "password": self.pw},
                     timeout=30,
                 )
@@ -343,20 +341,23 @@ class Acc:
             log("donate " + str(DONATE_AMOUNT), self.short)
             bump("donated")
 
-    def collect_all(self):
+    def fish_cycle(self):
         st, tx = self.get(
-            "ships_owned?select=id,catalog_code,at_sea,preferred_fish_id,hp,max_hp&user_id=eq." +
-            self.uid + "&in_storage=eq.false&at_sea=eq.true"
+            "ships_owned?select=id,catalog_code,at_sea,hp,max_hp,preferred_fish_id"
+            "&user_id=eq." + self.uid + "&in_storage=eq.false"
         )
         if st != 200:
-            return 0
+            return 0, 0, 0
         try:
             ships = json.loads(tx)
         except:
-            return 0
+            return 0, 0, 0
+
+        at_sea = [s for s in ships if s.get("at_sea")]
+
         collected = 0
         total_fish = 0
-        for s in ships:
+        for s in at_sea:
             fish = s.get("preferred_fish_id") or "poseidon"
             st, tx = self.rpc("collect_fishing_reward", {
                 "_ship_id": s["id"],
@@ -374,68 +375,58 @@ class Acc:
                         log("collect " + str(s.get("catalog_code")) + " " + str(qty) + "x" + fid, self.short)
                 except:
                     pass
+            self.rpc("set_ship_at_sea", {"_ship_id": s["id"], "_at_sea": False})
+            time.sleep(random.uniform(0.3, 0.7))
+
+        st, tx = self.rpc("get_fish_stock_summary", {})
+        sold = 0
+        if st == 200:
+            try:
+                stock = json.loads(tx)
+            except:
+                stock = []
+            for item in stock:
+                fid = item.get("fish_id")
+                qty = item.get("qty", 0)
+                if not fid or qty <= 0:
+                    continue
+                st2, _ = self.rpc("sell_fish_by_qty", {
+                    "_fish_id": fid,
+                    "_qty": qty,
+                    "_client_version": CV,
+                })
+                if st2 in (200, 204):
+                    sold += qty
+                    log("sell " + str(qty) + "x" + fid, self.short)
+                time.sleep(random.uniform(0.3, 0.7))
+
+        st, tx = self.get(
+            "ships_owned?select=id,catalog_code,at_sea,hp,max_hp"
+            "&user_id=eq." + self.uid + "&in_storage=eq.false"
+        )
+        sent = 0
+        if st == 200:
+            try:
+                ships2 = json.loads(tx)
+            except:
+                ships2 = []
+            for s in ships2:
+                if s.get("at_sea"):
+                    continue
                 hp = s.get("hp") or 0
                 mx = s.get("max_hp") or 1
-                if hp / mx >= MIN_HP_PCT:
-                    self.rpc("set_ship_at_sea", {"_ship_id": s["id"], "_at_sea": True})
-            time.sleep(random.uniform(0.3, 0.6))
+                if hp / mx < MIN_HP_PCT:
+                    continue
+                st2, _ = self.rpc("set_ship_at_sea", {"_ship_id": s["id"], "_at_sea": True})
+                if st2 in (200, 204):
+                    sent += 1
+                time.sleep(random.uniform(0.3, 0.7))
+
         bump("collected", collected)
+        bump("sold", sold)
         if total_fish:
             acc_bump(self.email, "fish", total_fish)
-        return collected
-
-    def sell_fish(self):
-        st, tx = self.rpc("get_fish_stock_summary", {})
-        if st != 200:
-            return 0
-        try:
-            stock = json.loads(tx)
-        except:
-            return 0
-        sold = 0
-        for it in (stock or []):
-            fid = it.get("fish_id")
-            qty = it.get("qty", 0)
-            if not fid or qty <= 0:
-                continue
-            st2, _ = self.rpc("sell_fish_by_qty", {
-                "_fish_id": fid,
-                "_qty": qty,
-                "_client_version": CV,
-            })
-            if st2 in (200, 204):
-                sold += qty
-                log("sell " + str(qty) + "x" + fid, self.short)
-            time.sleep(random.uniform(0.4, 0.9))
-        bump("sold", sold)
-        return sold
-
-    def send_ships_to_sea(self):
-        st, tx = self.get(
-            "ships_owned?select=id,catalog_code,hp,max_hp,destroyed_at&user_id=eq." +
-            self.uid + "&in_storage=eq.true"
-        )
-        if st != 200:
-            return 0
-        try:
-            ships = json.loads(tx)
-        except:
-            return 0
-        sent = 0
-        for s in ships:
-            if s.get("destroyed_at"):
-                continue
-            hp = s.get("hp") or 0
-            mx = s.get("max_hp") or 1
-            if hp / mx < MIN_HP_PCT:
-                continue
-            st2, _ = self.rpc("set_ship_at_sea", {"_ship_id": s["id"], "_at_sea": True})
-            if st2 in (200, 204):
-                sent += 1
-            time.sleep(random.uniform(0.3, 0.6))
-        if sent:
-            log("send " + str(sent) + " ships to sea", self.short)
-        return sent
+        return collected, sold, sent
 
 MAIN_LOG = {}
 
@@ -463,6 +454,16 @@ def main_worker(cfg, idx):
     acc.donate_tribe()
     log("main end", acc.short)
 
+def fish_worker(cfg, idx):
+    time.sleep(idx * 1.5)
+    acc = Acc(cfg, idx)
+    if not acc.login():
+        bump("login_fail")
+        return
+    c, s, sent = acc.fish_cycle()
+    bump("fish_cycles")
+    log("cycle collect=" + str(c) + " sold=" + str(s) + " sent=" + str(sent), acc.short)
+
 def run_main_cycle():
     log("=" * 40)
     log("MAIN CYCLE")
@@ -479,51 +480,18 @@ def run_main_cycle():
     with LOCK:
         STATS["last_main"] = time.time()
 
-def fish_cycle_collect(cfg, idx, accs):
-    time.sleep(idx * 1.5)
-    acc = Acc(cfg, idx)
-    accs[idx] = acc
-    if not acc.login():
-        bump("login_fail")
-        return
-    acc.collect_all()
-
-def fish_cycle_sell(idx, accs):
-    time.sleep(idx * 0.3)
-    acc = accs[idx]
-    if acc is None:
-        return
-    acc.sell_fish()
-    acc.send_ships_to_sea()
-
 def run_fish_cycle():
     log("=" * 40)
-    log("FISH CYCLE - PHASE 1: COLLECT + RETURN")
+    log("FISH CYCLE")
     log("=" * 40)
-
-    accs = [None] * len(ACCOUNTS)
     threads = []
     for i, cfg in enumerate(ACCOUNTS):
-        t = threading.Thread(target=fish_cycle_collect, args=(cfg, i, accs))
+        t = threading.Thread(target=fish_worker, args=(cfg, i))
         t.start()
         threads.append(t)
         time.sleep(0.3)
     for t in threads:
         t.join()
-
-    log("=" * 40)
-    log("FISH CYCLE - PHASE 2: SELL")
-    log("=" * 40)
-
-    threads = []
-    for i in range(len(ACCOUNTS)):
-        t = threading.Thread(target=fish_cycle_sell, args=(i, accs))
-        t.start()
-        threads.append(t)
-    for t in threads:
-        t.join()
-
-    bump("fish_cycles")
     with LOCK:
         STATS["last_fish"] = time.time()
 
@@ -573,7 +541,7 @@ def index():
     </style>
     </head>
     <body>
-    <h1>CIPHER CLOUD v2.0</h1>
+    <h1>CIPHER CLOUD v3.0</h1>
     <p style="color:#9ca3af;margin-bottom:20px;">Accounts: {{ acc_count }} | Uptime: {{ h }}h {{ m }}m</p>
     <div class="grid">
       <div class="card"><div class="label">Main Cycles</div><div class="value">{{ main_cycles }}</div></div>
@@ -618,6 +586,7 @@ def index():
 
 @app.route("/health")
 @app.route("/healthz")
+@app.route("/api/healthz")
 def health():
     return jsonify({"ok": True, "uptime": int(time.time() - STATS["started_at"])})
 
