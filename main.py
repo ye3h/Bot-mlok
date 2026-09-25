@@ -18,8 +18,8 @@ def load_accounts():
 
 ACCOUNTS = load_accounts()
 
-MAIN_INTERVAL = int(os.environ.get("MAIN_INTERVAL_HOURS", "6")) * 3600
-FISH_INTERVAL = int(os.environ.get("FISH_INTERVAL_SECONDS", "300"))
+MAIN_INTERVAL = int(os.environ.get("MAIN_INTERVAL_HOURS", "15")) * 3600
+FISH_INTERVAL = int(os.environ.get("FISH_INTERVAL_SECONDS", "660"))
 STAGGER = 3
 MIN_HP_PCT = 0.3
 BUY_ROCKET_COUNT = int(os.environ.get("BUY_ROCKET_COUNT", "30"))
