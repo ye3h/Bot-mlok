@@ -1,10 +1,31 @@
-import os, sys, json, time, random, threading, requests
-from datetime import datetime as dt, timedelta
+import os, sys, json, time, random, threading, requests, re
+from datetime import datetime as dt, timedelta, timezone
 from flask import Flask, jsonify, render_template_string
 
 API = "https://qjwbfkpudysxqtkeouwu.supabase.co"
 KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFqd2Jma3B1ZHlzeHF0a2VvdXd1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk3NDEyNDksImV4cCI6MjA5NTMxNzI0OX0.rs4NXx8bMPQ3k8Zgf_F3efeDPuAsxPlqS0bZ3cFE9dI"
+
+FISH_INTERVAL_SECONDS = int(os.environ.get("FISH_INTERVAL_SECONDS", "660"))
+MAIN_INTERVAL_HOURS   = int(os.environ.get("MAIN_INTERVAL_HOURS", "20"))
+MAIN_INTERVAL_SECONDS = MAIN_INTERVAL_HOURS * 3600
+PHASE_DURATION_SEC    = int(os.environ.get("PHASE_DURATION_SEC", "300"))
+
+MAIN_ENABLED = os.environ.get("MAIN_ENABLED", "1") == "1"
+FISH_ENABLED = os.environ.get("FISH_ENABLED", "1") == "1"
+
+MIN_HP_PCT       = 0.3
+BUY_ROCKET_COUNT = int(os.environ.get("BUY_ROCKET_COUNT", "30"))
+BOSS_ATTACKS     = int(os.environ.get("BOSS_ATTACKS", "5"))
+DONATE_AMOUNT    = int(os.environ.get("DONATE_AMOUNT", "10000"))
 CV = "fish-market-v20260626-force-update-1"
+
+USER_AGENTS = [
+    "Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.7 Mobile/15E148 Safari/604.1",
+    "Mozilla/5.0 (iPhone; CPU iPhone OS 18_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.6 Mobile/15E148 Safari/604.1",
+    "Mozilla/5.0 (iPhone; CPU iPhone OS 17_7 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.7 Mobile/15E148 Safari/604.1",
+]
+
+PAUSE_FISH = threading.Event()
 
 def load_accounts():
     accounts = []
@@ -13,24 +34,9 @@ def load_accounts():
         p = os.environ.get("ACC" + str(i) + "_PASS", "").strip()
         if e and p:
             accounts.append({"email": e, "password": p})
-    print("[CONFIG] Loaded " + str(len(accounts)) + " accounts")
     return accounts
 
 ACCOUNTS = load_accounts()
-
-MAIN_INTERVAL = int(os.environ.get("MAIN_INTERVAL_HOURS", "15")) * 3600
-FISH_INTERVAL = int(os.environ.get("FISH_INTERVAL_SECONDS", "660"))
-STAGGER = 3
-MIN_HP_PCT = 0.3
-BUY_ROCKET_COUNT = int(os.environ.get("BUY_ROCKET_COUNT", "30"))
-BOSS_ATTACKS = int(os.environ.get("BOSS_ATTACKS", "5"))
-DONATE_AMOUNT = int(os.environ.get("DONATE_AMOUNT", "10000"))
-
-USER_AGENTS = [
-    "Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.7 Mobile/15E148 Safari/604.1",
-    "Mozilla/5.0 (iPhone; CPU iPhone OS 18_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.6 Mobile/15E148 Safari/604.1",
-    "Mozilla/5.0 (iPhone; CPU iPhone OS 17_7 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.7 Mobile/15E148 Safari/604.1",
-]
 
 LOCK = threading.Lock()
 STATS = {
@@ -40,7 +46,7 @@ STATS = {
     "attacked": 0, "damage": 0, "donated": 0,
     "collected": 0, "sold": 0,
     "fish_cycles": 0, "main_cycles": 0,
-    "last_fish": None, "last_main": None,
+    "last_fish": None, "last_main": None, "last_run": None,
     "errors": 0,
     "account_stats": {},
 }
@@ -58,7 +64,7 @@ def log(msg, tag=""):
         print(line)
         sys.stdout.flush()
         LOG_LINES.append(line)
-        if len(LOG_LINES) > 300:
+        if len(LOG_LINES) > 500:
             LOG_LINES.pop(0)
 
 def bump(k, n=1):
@@ -68,11 +74,14 @@ def bump(k, n=1):
 def acc_bump(email, k, n=1):
     with LOCK:
         if email not in STATS["account_stats"]:
-            STATS["account_stats"][email] = {"gems": 0, "coins": 0, "fish": 0, "damage": 0}
+            STATS["account_stats"][email] = {
+                "gems": 0, "coins": 0, "fish": 0,
+                "damage": 0, "donated": 0,
+            }
         STATS["account_stats"][email][k] = STATS["account_stats"][email].get(k, 0) + n
 
 def riyadh_date():
-    return (dt.now(dt.UTC) + timedelta(hours=3)).strftime("%Y-%m-%d")
+    return (dt.now(timezone.utc) + timedelta(hours=3)).strftime("%Y-%m-%d")
 
 class Acc:
     def __init__(self, cfg, idx):
@@ -119,9 +128,7 @@ class Acc:
                     self.expires = time.time() + d.get("expires_in", 3600) - 300
                     return True
                 if r.status_code == 429:
-                    wait = (attempt + 1) * 20
-                    log("rate limit " + str(wait) + "s", self.short)
-                    time.sleep(wait)
+                    time.sleep((attempt + 1) * 20)
                     continue
                 if attempt < 3:
                     time.sleep(3)
@@ -227,7 +234,9 @@ class Acc:
             log("free rockets", self.short)
             bump("free")
 
-    def buy_rockets(self):
+    def buy_rockets(self, total=None):
+        if total is None:
+            total = BUY_ROCKET_COUNT
         bought = 0
         for _ in range(10):
             st, tx = self.rpc("buy_with_coins", {
@@ -311,8 +320,7 @@ class Acc:
                 hits += 1
                 try:
                     j = json.loads(tx)
-                    dmg = j.get("damage", 0)
-                    dmg_total += dmg
+                    dmg_total += j.get("damage", 0)
                 except:
                     pass
             else:
@@ -334,12 +342,17 @@ class Acc:
             coins = p.get("coins") or 0
         except:
             return
-        if not tid or coins < DONATE_AMOUNT:
+        if not tid:
+            log("no tribe", self.short)
+            return
+        if coins < DONATE_AMOUNT:
+            log("low coins: " + "{:,}".format(coins), self.short)
             return
         st, tx = self.rpc("donate_to_tribe", {"_tribe_id": tid, "_amount": DONATE_AMOUNT})
         if st in (200, 204):
-            log("donate " + str(DONATE_AMOUNT), self.short)
+            log("donate " + str(DONATE_AMOUNT) + " -> " + tid[:8], self.short)
             bump("donated")
+            acc_bump(self.email, "donated", DONATE_AMOUNT)
 
     def fish_cycle(self):
         st, tx = self.get(
@@ -352,9 +365,7 @@ class Acc:
             ships = json.loads(tx)
         except:
             return 0, 0, 0
-
         at_sea = [s for s in ships if s.get("at_sea")]
-
         collected = 0
         total_fish = 0
         for s in at_sea:
@@ -421,41 +432,14 @@ class Acc:
                 if st2 in (200, 204):
                     sent += 1
                 time.sleep(random.uniform(0.3, 0.7))
-
         bump("collected", collected)
         bump("sold", sold)
         if total_fish:
             acc_bump(self.email, "fish", total_fish)
         return collected, sold, sent
 
-MAIN_LOG = {}
-
-def main_worker(cfg, idx):
-    time.sleep(idx * STAGGER)
-    acc = Acc(cfg, idx)
-    if not acc.login():
-        bump("login_fail")
-        return
-    bump("login")
-    log("main start", acc.short)
-    key = acc.email + ":daily"
-    if MAIN_LOG.get(key) != riyadh_date():
-        acc.claim_daily()
-        MAIN_LOG[key] = riyadh_date()
-    time.sleep(1)
-    acc.do_quests()
-    time.sleep(1)
-    acc.claim_free_rockets()
-    time.sleep(1)
-    acc.buy_rockets()
-    time.sleep(1)
-    acc.attack_boss()
-    time.sleep(1)
-    acc.donate_tribe()
-    log("main end", acc.short)
-
 def fish_worker(cfg, idx):
-    time.sleep(idx * 1.5)
+    time.sleep(idx * 0.3)
     acc = Acc(cfg, idx)
     if not acc.login():
         bump("login_fail")
@@ -464,49 +448,129 @@ def fish_worker(cfg, idx):
     bump("fish_cycles")
     log("cycle collect=" + str(c) + " sold=" + str(s) + " sent=" + str(sent), acc.short)
 
-def run_main_cycle():
+def worker_boss_rockets(cfg, idx):
+    time.sleep(idx * 0.5)
+    acc = Acc(cfg, idx)
+    if not acc.login():
+        bump("login_fail")
+        return
+    bump("login")
+    acc.claim_free_rockets()
+    time.sleep(0.5)
+    acc.buy_rockets(30)
+    time.sleep(0.5)
+    acc.attack_boss(5)
+
+def worker_daily_quests(cfg, idx):
+    time.sleep(idx * 0.5)
+    acc = Acc(cfg, idx)
+    if not acc.login():
+        bump("login_fail")
+        return
+    bump("login")
+    acc.claim_daily()
+    time.sleep(0.5)
+    acc.do_quests()
+
+def worker_donate(cfg, idx):
+    time.sleep(idx * 0.5)
+    acc = Acc(cfg, idx)
+    if not acc.login():
+        bump("login_fail")
+        return
+    bump("login")
+    acc.donate_tribe()
+
+def run_parallel(worker, name, stagger=0.5):
     log("=" * 40)
-    log("MAIN CYCLE")
+    log(name)
     log("=" * 40)
     threads = []
     for i, cfg in enumerate(ACCOUNTS):
-        t = threading.Thread(target=main_worker, args=(cfg, i))
+        t = threading.Thread(target=worker, args=(cfg, i))
         t.start()
         threads.append(t)
-        time.sleep(0.5)
+        time.sleep(stagger)
     for t in threads:
         t.join()
-    bump("main_cycles")
-    with LOCK:
-        STATS["last_main"] = time.time()
+
+def run_phase(worker, name):
+    log(name + " - start")
+    start = time.time()
+    run_parallel(worker, name)
+    elapsed = time.time() - start
+    remaining = PHASE_DURATION_SEC - elapsed
+    if remaining > 0:
+        log(name + " done in " + str(int(elapsed)) + "s - waiting " + str(int(remaining)) + "s")
+        time.sleep(remaining)
+    else:
+        log(name + " done in " + str(int(elapsed)) + "s (exceeded)")
+    log(name + " complete")
 
 def run_fish_cycle():
-    log("=" * 40)
-    log("FISH CYCLE")
-    log("=" * 40)
-    threads = []
-    for i, cfg in enumerate(ACCOUNTS):
-        t = threading.Thread(target=fish_worker, args=(cfg, i))
-        t.start()
-        threads.append(t)
-        time.sleep(0.3)
-    for t in threads:
-        t.join()
+    if PAUSE_FISH.is_set():
+        log("fish paused - skip")
+        return
+    run_parallel(fish_worker, "FISH CYCLE", stagger=0.3)
     with LOCK:
         STATS["last_fish"] = time.time()
 
-def main_thread():
-    run_main_cycle()
-    while True:
-        log("next main in " + str(MAIN_INTERVAL // 3600) + "h")
-        time.sleep(MAIN_INTERVAL)
-        run_main_cycle()
+def run_main_cycle():
+    PAUSE_FISH.set()
+    total_start = time.time()
+    try:
+        log("=" * 50)
+        log("PAUSED FISH - starting MAIN")
+        log("=" * 50)
+        run_phase(worker_boss_rockets, "PHASE 1: rockets + boss")
+        run_phase(worker_daily_quests, "PHASE 2: daily + quests")
+        run_phase(worker_donate, "PHASE 3: donate tribe")
+        with LOCK:
+            STATS["last_run"] = time.time()
+        bump("main_cycles")
+    except Exception as e:
+        log("main err: " + str(e)[:150])
+        bump("errors")
+    finally:
+        PAUSE_FISH.clear()
+        total = int(time.time() - total_start)
+        log("=" * 50)
+        log("RESUMED FISH - main took " + str(total // 60) + "m " + str(total % 60) + "s")
+        log("=" * 50)
 
-def fish_thread():
+def fish_loop_thread():
+    time.sleep(15)
     while True:
-        run_fish_cycle()
-        log("next fish in " + str(FISH_INTERVAL) + "s")
-        time.sleep(FISH_INTERVAL)
+        if PAUSE_FISH.is_set():
+            log("fish paused - waiting...")
+            while PAUSE_FISH.is_set():
+                time.sleep(5)
+        if FISH_ENABLED:
+            try:
+                run_fish_cycle()
+            except Exception as e:
+                log("fish err: " + str(e)[:150])
+                bump("errors")
+        log("next fish in " + str(FISH_INTERVAL_SECONDS) + "s")
+        end = time.time() + FISH_INTERVAL_SECONDS
+        while time.time() < end:
+            if PAUSE_FISH.is_set():
+                break
+            time.sleep(5)
+
+def scheduler_thread():
+    time.sleep(5)
+    while True:
+        try:
+            if MAIN_ENABLED:
+                run_main_cycle()
+        except Exception as e:
+            log("scheduler err: " + str(e)[:150])
+            bump("errors")
+        log("next main in " + str(MAIN_INTERVAL_HOURS) + "h")
+        end = time.time() + MAIN_INTERVAL_SECONDS
+        while time.time() < end:
+            time.sleep(30)
 
 app = Flask(__name__)
 
@@ -515,78 +579,82 @@ def index():
     uptime = int(time.time() - STATS["started_at"])
     h = uptime // 3600
     m = (uptime % 3600) // 60
-    last_fish = STATS["last_fish"]
-    last_main = STATS["last_main"]
-    fish_ago = int(time.time() - last_fish) if last_fish else "-"
-    main_ago = int((time.time() - last_main) // 60) if last_main else "-"
+    def ago(t):
+        return int(time.time() - t) if t else "-"
+    fish_status = "PAUSED" if PAUSE_FISH.is_set() else "RUNNING"
     html = """
-    <!DOCTYPE html>
-    <html lang="ar" dir="rtl">
-    <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width,initial-scale=1">
-    <title>CIPHER CLOUD</title>
-    <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: -apple-system, sans-serif; background: #0a0e1a; color: #e0e0e0; padding: 20px; }
-    h1 { color: #fbbf24; margin-bottom: 20px; font-size: 24px; }
-    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 24px; }
-    .card { background: #111827; border: 1px solid #1f2937; border-radius: 10px; padding: 16px; }
-    .card .label { font-size: 12px; color: #9ca3af; margin-bottom: 6px; }
-    .card .value { font-size: 22px; font-weight: bold; color: #fbbf24; }
-    .log { background: #000; border-radius: 8px; padding: 14px; font-family: monospace; font-size: 11px; max-height: 500px; overflow-y: auto; }
-    .log div { padding: 2px 0; border-bottom: 1px solid #111; }
-    .green { color: #4ade80; }
-    .red { color: #f87171; }
-    </style>
-    </head>
-    <body>
-    <h1>CIPHER CLOUD v3.0</h1>
-    <p style="color:#9ca3af;margin-bottom:20px;">Accounts: {{ acc_count }} | Uptime: {{ h }}h {{ m }}m</p>
+    <!DOCTYPE html><html lang="ar" dir="rtl"><head>
+    <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>CIPHER UNIFIED v3</title><style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:-apple-system,sans-serif;background:#0a0e1a;color:#e0e0e0;padding:20px}
+    h1{color:#fbbf24;margin-bottom:20px;font-size:24px}
+    .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:24px}
+    .card{background:#111827;border:1px solid #1f2937;border-radius:10px;padding:16px}
+    .card .label{font-size:12px;color:#9ca3af;margin-bottom:6px}
+    .card .value{font-size:22px;font-weight:bold;color:#fbbf24}
+    .log{background:#000;border-radius:8px;padding:14px;font-family:monospace;font-size:11px;max-height:500px;overflow-y:auto}
+    .log div{padding:2px 0;border-bottom:1px solid #111}
+    .green{color:#4ade80}.red{color:#f87171}.yellow{color:#fbbf24}
+    </style></head><body>
+    <h1>CIPHER UNIFIED v3</h1>
+    <p style="color:#9ca3af;margin-bottom:20px;">
+      Accounts: {{ acc_count }} | Uptime: {{ h }}h {{ m }}m<br>
+      Fish: every {{ fish_int }}s | Main: every {{ main_int }}h<br>
+      Fish Status: <b class="yellow">{{ fish_status }}</b>
+    </p>
     <div class="grid">
-      <div class="card"><div class="label">Main Cycles</div><div class="value">{{ main_cycles }}</div></div>
       <div class="card"><div class="label">Fish Cycles</div><div class="value">{{ fish_cycles }}</div></div>
       <div class="card"><div class="label">Collected</div><div class="value">{{ collected }}</div></div>
       <div class="card"><div class="label">Fish Sold</div><div class="value">{{ sold }}</div></div>
+      <div class="card"><div class="label">Main Cycles</div><div class="value">{{ main_cycles }}</div></div>
       <div class="card"><div class="label">Daily</div><div class="value">{{ daily }}</div></div>
       <div class="card"><div class="label">Quests</div><div class="value">{{ quest_ok }}</div></div>
-      <div class="card"><div class="label">Rockets</div><div class="value">{{ bought }}</div></div>
+      <div class="card"><div class="label">Free Rockets</div><div class="value">{{ free }}</div></div>
+      <div class="card"><div class="label">Bought</div><div class="value">{{ bought }}</div></div>
       <div class="card"><div class="label">Attacks</div><div class="value">{{ attacked }}</div></div>
       <div class="card"><div class="label">Damage</div><div class="value">{{ damage }}</div></div>
       <div class="card"><div class="label">Donated</div><div class="value">{{ donated }}</div></div>
       <div class="card"><div class="label">Login OK</div><div class="value green">{{ login }}</div></div>
       <div class="card"><div class="label">Login Fail</div><div class="value red">{{ login_fail }}</div></div>
+      <div class="card"><div class="label">Errors</div><div class="value red">{{ errors }}</div></div>
     </div>
-    <p style="color:#9ca3af;margin-bottom:10px;">Last fish: {{ fish_ago }}s ago | Last main: {{ main_ago }}m ago</p>
+    <p style="color:#9ca3af;margin-bottom:10px;">
+      Last run: {{ last_run }}s | Last main: {{ last_main }}s | Last fish: {{ last_fish }}s
+    </p>
     <h2 style="color:#fbbf24;margin:20px 0 10px;font-size:18px;">Live Log</h2>
     <div class="log">{% for line in logs %}<div>{{ line }}</div>{% endfor %}</div>
-    </body>
-    </html>
+    </body></html>
     """
     return render_template_string(
         html,
         acc_count=len(ACCOUNTS),
         h=h, m=m,
-        main_cycles=STATS["main_cycles"],
+        fish_int=FISH_INTERVAL_SECONDS,
+        main_int=MAIN_INTERVAL_HOURS,
+        fish_status=fish_status,
         fish_cycles=STATS["fish_cycles"],
+        main_cycles=STATS["main_cycles"],
         collected=STATS["collected"],
         sold="{:,}".format(STATS["sold"]),
         daily=STATS["daily"],
         quest_ok=STATS["quest_ok"],
+        free=STATS["free"],
         bought=STATS["bought"],
         attacked=STATS["attacked"],
         damage="{:,}".format(STATS["damage"]),
         donated=STATS["donated"],
         login=STATS["login"],
         login_fail=STATS["login_fail"],
-        fish_ago=fish_ago,
-        main_ago=main_ago,
+        errors=STATS["errors"],
+        last_run=ago(STATS["last_run"]),
+        last_main=ago(STATS["last_main"]),
+        last_fish=ago(STATS["last_fish"]),
         logs=LOG_LINES[-150:],
     )
 
 @app.route("/health")
 @app.route("/healthz")
-@app.route("/api/healthz")
 def health():
     return jsonify({"ok": True, "uptime": int(time.time() - STATS["started_at"])})
 
@@ -594,23 +662,30 @@ def health():
 def api_status():
     return jsonify({
         "accounts": len(ACCOUNTS),
+        "fish_interval": FISH_INTERVAL_SECONDS,
+        "main_interval_hours": MAIN_INTERVAL_HOURS,
+        "phase_duration": PHASE_DURATION_SEC,
+        "fish_paused": PAUSE_FISH.is_set(),
         "stats": {k: v for k, v in STATS.items() if k != "account_stats"},
         "account_stats": STATS["account_stats"],
     })
 
-def start_bots():
+@app.route("/trigger", methods=["POST", "GET"])
+def trigger():
+    threading.Thread(target=run_main_cycle, daemon=True).start()
+    return jsonify({"ok": True, "msg": "main triggered"})
+
+def start_all():
     if not ACCOUNTS:
         log("no accounts configured", "INIT")
         return
     log("start " + str(len(ACCOUNTS)) + " accounts", "INIT")
-    log("main interval: " + str(MAIN_INTERVAL // 3600) + "h", "INIT")
-    log("fish interval: " + str(FISH_INTERVAL) + "s", "INIT")
-    t1 = threading.Thread(target=main_thread, daemon=True)
-    t1.start()
-    t2 = threading.Thread(target=fish_thread, daemon=True)
-    t2.start()
+    log("fish: every " + str(FISH_INTERVAL_SECONDS) + "s", "INIT")
+    log("main: every " + str(MAIN_INTERVAL_HOURS) + "h", "INIT")
+    threading.Thread(target=fish_loop_thread, daemon=True).start()
+    threading.Thread(target=scheduler_thread, daemon=True).start()
 
-start_bots()
+start_all()
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 10000))
