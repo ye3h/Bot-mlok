@@ -285,16 +285,18 @@ class Acc:
         except:
             return None
 
-    def attack_boss(self):
+    def attack_boss(self, times=None):
+        if times is None:
+            times = BOSS_ATTACKS
         st, tx = self.rpc("get_active_boss", {})
         if st != 200:
             return
         st, tx = self.rpc("boss_attack_status", {})
-        remaining = BOSS_ATTACKS
+        remaining = times
         if st == 200:
             try:
                 j = json.loads(tx)
-                remaining = min(BOSS_ATTACKS, j.get("remaining", BOSS_ATTACKS))
+                remaining = min(times, j.get("remaining", times))
             except:
                 pass
         if remaining <= 0:
