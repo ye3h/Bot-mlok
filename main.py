@@ -27,7 +27,6 @@ USER_AGENTS = [
     "Mozilla/5.0 (iPhone; CPU iPhone OS 17_7 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.7 Mobile/15E148 Safari/604.1",
 ]
 
-PAUSE_FISH = threading.Event()
 TIME_OFFSET = timedelta(0)
 TIME_OFFSET_LOCK = threading.Lock()
 
@@ -389,13 +388,14 @@ class Acc:
         ship = self.top_ship()
         if not ship:
             return
-        if (ship.get("hp") or 0) / (ship.get("max_hp") or 1) < MIN_HP_PCT:
+        if (ship.get("hp") or 0) / (ship.get("max_hp") or 1) <, MIN_HP_PCT:
             return
-        ship_id = ship["id"]
-        hits = 0
+        ship _id = ship["id"]
+        hits =0 0
         dmg_total = 0
+
         for i in range(remaining):
-            st, tx = self.get("ships_owned?select=hp,max_hp&id=eq." + ship_id)
+            st       , tx = self.get("ships try_owned?select=hp,max_hp&id=eq." + ship_id)
             try:
                 cur = json.loads(tx)[0]
                 if (cur.get("hp") or 0) / (cur.get("max_hp") or 1) < MIN_HP_PCT:
@@ -447,8 +447,7 @@ class Acc:
             "&user_id=eq." + self.uid + "&in_storage=eq.false"
         )
         if st != 200:
-            return 0, 0, 0
-        try:
+            return 0, 0:
             ships = json.loads(tx)
         except:
             return 0, 0, 0
@@ -592,30 +591,20 @@ def run_phase(worker, name):
     start = time.time()
     run_parallel(worker, name)
     elapsed = time.time() - start
-    remaining = PHASE_DURATION_SEC - elapsed
-    if remaining > 0:
-        log(name + " done in " + str(int(elapsed)) + "s - waiting " + str(int(remaining)) + "s")
-        time.sleep(remaining)
-    else:
-        log(name + " done in " + str(int(elapsed)) + "s (exceeded)")
-    log(name + " complete")
+    log(name + " complete in " + str(int(elapsed)) + "s")
 
 
 def run_fish_cycle():
-    if PAUSE_FISH.is_set():
-        log("fish paused - skip")
-        return
     run_parallel(fish_worker, "FISH CYCLE", stagger=0.3)
     with LOCK:
         STATS["last_fish"] = time.time()
 
 
 def run_main_cycle():
-    PAUSE_FISH.set()
     total_start = time.time()
     try:
         log("=" * 50)
-        log("PAUSED FISH - starting MAIN")
+        log("MAIN CYCLE START (fish continues)")
         log("=" * 50)
         run_phase(worker_boss_rockets, "PHASE 1: rockets + boss")
         run_phase(worker_daily_quests, "PHASE 2: daily + quests")
@@ -626,21 +615,15 @@ def run_main_cycle():
     except Exception as e:
         log("main err: " + str(e)[:150])
         bump("errors")
-    finally:
-        PAUSE_FISH.clear()
-        total = int(time.time() - total_start)
-        log("=" * 50)
-        log("RESUMED FISH - main took " + str(total // 60) + "m " + str(total % 60) + "s")
-        log("=" * 50)
+    total = int(time.time() - total_start)
+    log("=" * 50)
+    log("MAIN CYCLE DONE in " + str(total // 60) + "m " + str(total % 60) + "s")
+    log("=" * 50)
 
 
 def fish_loop_thread():
     time.sleep(15)
     while True:
-        if PAUSE_FISH.is_set():
-            log("fish paused - waiting...")
-            while PAUSE_FISH.is_set():
-                time.sleep(5)
         if FISH_ENABLED:
             try:
                 run_fish_cycle()
@@ -648,11 +631,7 @@ def fish_loop_thread():
                 log("fish err: " + str(e)[:150])
                 bump("errors")
         log("next fish in " + str(FISH_INTERVAL_SECONDS) + "s")
-        end = time.time() + FISH_INTERVAL_SECONDS
-        while time.time() < end:
-            if PAUSE_FISH.is_set():
-                break
-            time.sleep(5)
+        time.sleep(FISH_INTERVAL_SECONDS)
 
 
 def scheduler_thread():
@@ -728,13 +707,12 @@ def index():
     def ago(t):
         return int(time.time() - t) if t else "-"
 
-    fish_status = "PAUSED" if PAUSE_FISH.is_set() else "RUNNING"
     now_r = now_riyadh().strftime("%Y-%m-%d %H:%M:%S")
     next_main = fmt_dur(seconds_until_riyadh(MAIN_HOUR, MAIN_MINUTE))
     html = """
     <!DOCTYPE html><html lang="ar" dir="rtl"><head>
     <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-    <title>CIPHER v6</title><style>
+    <title>CIPHER v7</title><style>
     *{box-sizing:border-box;margin:0;padding:0}
     body{font-family:-apple-system,sans-serif;background:#0a0e1a;color:#e0e0e0;padding:20px}
     h1{color:#fbbf24;margin-bottom:20px;font-size:24px}
@@ -746,15 +724,14 @@ def index():
     .log div{padding:2px 0;border-bottom:1px solid #111}
     .green{color:#4ade80}.red{color:#f87171}.yellow{color:#fbbf24}.blue{color:#60a5fa}
     </style></head><body>
-    <h1>CIPHER UNIFIED v6</h1>
+    <h1>CIPHER UNIFIED v7</h1>
     <p style="color:#9ca3af;margin-bottom:20px;">
       Accounts: {{ acc_count }} | Uptime: {{ h }}h {{ m }}m<br>
-      Fish: every {{ fish_int }}s<br>
+      Fish: every {{ fish_int }}s (24/7 - never stops)<br>
       <b class="blue">Main: {{ main_time }} Riyadh daily</b><br>
       <b class="blue">Next main in: {{ next_main }}</b><br>
       Now Riyadh: <b>{{ now_riyadh }}</b><br>
-      Time Source: <b class="yellow">{{ time_source }}</b> | Offset: {{ time_offset }}s<br>
-      Fish Status: <b class="yellow">{{ fish_status }}</b>
+      Time Source: <b class="yellow">{{ time_source }}</b> | Offset: {{ time_offset }}s
     </p>
     <div class="grid">
       <div class="card"><div class="label">Fish Cycles</div><div class="value">{{ fish_cycles }}</div></div>
@@ -789,7 +766,6 @@ def index():
         now_riyadh=now_r,
         time_source=STATS.get("time_source", "local"),
         time_offset=STATS.get("time_offset_sec", 0),
-        fish_status=fish_status,
         fish_cycles=STATS["fish_cycles"],
         main_cycles=STATS["main_cycles"],
         collected=STATS["collected"],
@@ -824,12 +800,10 @@ def api_status():
         "fish_interval": FISH_INTERVAL_SECONDS,
         "main_hour": MAIN_HOUR,
         "main_minute": MAIN_MINUTE,
-        "phase_duration": PHASE_DURATION_SEC,
         "now_riyadh": now_riyadh().strftime("%Y-%m-%d %H:%M:%S"),
         "next_main_in_sec": int(seconds_until_riyadh(MAIN_HOUR, MAIN_MINUTE)),
         "time_source": STATS.get("time_source", "local"),
         "time_offset_sec": STATS.get("time_offset_sec", 0),
-        "fish_paused": PAUSE_FISH.is_set(),
         "stats": {k: v for k, v in STATS.items() if k != "account_stats"},
         "account_stats": STATS["account_stats"],
     })
@@ -857,7 +831,7 @@ def start_all():
         log("no accounts configured", "INIT")
         return
     log("start " + str(len(ACCOUNTS)) + " accounts", "INIT")
-    log("fish: every " + str(FISH_INTERVAL_SECONDS) + "s", "INIT")
+    log("fish: every " + str(FISH_INTERVAL_SECONDS) + "s (24/7)", "INIT")
     log("main: " + str(MAIN_HOUR) + ":" + str(MAIN_MINUTE).zfill(2) + " Riyadh daily", "INIT")
     threading.Thread(target=fish_loop_thread, daemon=True).start()
     threading.Thread(target=scheduler_thread, daemon=True).start()
