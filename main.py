@@ -7,7 +7,7 @@ KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFq
 TIME_FALLBACK_URL = "http://worldtimeapi.org/api/timezone/Asia/Riyadh"
 
 FISH_INTERVAL_SECONDS = int(os.environ.get("FISH_INTERVAL_SECONDS", "660"))
-PHASE_DURATION_SEC    = int(os.environ.get("PHASE_DURATION_SEC", "300"))
+PHASE_DURATION_SEC = int(os.environ.get("PHASE_DURATION_SEC", "300"))
 
 MAIN_ENABLED = os.environ.get("MAIN_ENABLED", "1") == "1"
 FISH_ENABLED = os.environ.get("FISH_ENABLED", "1") == "1"
@@ -15,10 +15,10 @@ FISH_ENABLED = os.environ.get("FISH_ENABLED", "1") == "1"
 MAIN_HOUR = int(os.environ.get("MAIN_HOUR", "20"))
 MAIN_MINUTE = int(os.environ.get("MAIN_MINUTE", "25"))
 
-MIN_HP_PCT       = 0.3
+MIN_HP_PCT = 0.3
 BUY_ROCKET_COUNT = int(os.environ.get("BUY_ROCKET_COUNT", "30"))
-BOSS_ATTACKS     = int(os.environ.get("BOSS_ATTACKS", "5"))
-DONATE_AMOUNT    = int(os.environ.get("DONATE_AMOUNT", "10000"))
+BOSS_ATTACKS = int(os.environ.get("BOSS_ATTACKS", "5"))
+DONATE_AMOUNT = int(os.environ.get("DONATE_AMOUNT", "10000"))
 CV = "fish-market-v20260626-force-update-1"
 
 USER_AGENTS = [
@@ -31,6 +31,7 @@ PAUSE_FISH = threading.Event()
 TIME_OFFSET = timedelta(0)
 TIME_OFFSET_LOCK = threading.Lock()
 
+
 def load_accounts():
     accounts = []
     for i in range(1, 31):
@@ -39,6 +40,7 @@ def load_accounts():
         if e and p:
             accounts.append({"email": e, "password": p})
     return accounts
+
 
 ACCOUNTS = load_accounts()
 
@@ -59,6 +61,7 @@ STATS = {
 LOG_LINES = []
 LOG_LOCK = threading.Lock()
 
+
 def log(msg, tag=""):
     ts = dt.now().strftime("%H:%M:%S")
     p = "[" + ts + "]"
@@ -72,9 +75,11 @@ def log(msg, tag=""):
         if len(LOG_LINES) > 500:
             LOG_LINES.pop(0)
 
+
 def bump(k, n=1):
     with LOCK:
         STATS[k] = STATS.get(k, 0) + n
+
 
 def acc_bump(email, k, n=1):
     with LOCK:
@@ -84,6 +89,7 @@ def acc_bump(email, k, n=1):
                 "damage": 0, "donated": 0,
             }
         STATS["account_stats"][email][k] = STATS["account_stats"][email].get(k, 0) + n
+
 
 def sync_time_offset():
     global TIME_OFFSET
@@ -131,15 +137,19 @@ def sync_time_offset():
         STATS["time_source"] = "local"
     return False
 
+
 def now_utc():
     with TIME_OFFSET_LOCK:
         return dt.now(timezone.utc) + TIME_OFFSET
 
+
 def now_riyadh():
     return now_utc() + timedelta(hours=3)
 
+
 def riyadh_date():
     return now_riyadh().strftime("%Y-%m-%d")
+
 
 def seconds_until_riyadh(hour, minute):
     now = now_riyadh()
@@ -148,6 +158,7 @@ def seconds_until_riyadh(hour, minute):
         target += timedelta(days=1)
     return (target - now).total_seconds()
 
+
 def fmt_dur(sec):
     sec = int(sec)
     h = sec // 3600
@@ -155,6 +166,7 @@ def fmt_dur(sec):
     if h > 0:
         return str(h) + "h " + str(m) + "m"
     return str(m) + "m"
+
 
 class Acc:
     def __init__(self, cfg, idx):
@@ -513,6 +525,7 @@ class Acc:
             acc_bump(self.email, "fish", total_fish)
         return collected, sold, sent
 
+
 def fish_worker(cfg, idx):
     time.sleep(idx * 0.3)
     acc = Acc(cfg, idx)
@@ -522,6 +535,7 @@ def fish_worker(cfg, idx):
     c, s, sent = acc.fish_cycle()
     bump("fish_cycles")
     log("cycle collect=" + str(c) + " sold=" + str(s) + " sent=" + str(sent), acc.short)
+
 
 def worker_boss_rockets(cfg, idx):
     time.sleep(idx * 0.5)
@@ -536,6 +550,7 @@ def worker_boss_rockets(cfg, idx):
     time.sleep(0.5)
     acc.attack_boss(5)
 
+
 def worker_daily_quests(cfg, idx):
     time.sleep(idx * 0.5)
     acc = Acc(cfg, idx)
@@ -547,6 +562,7 @@ def worker_daily_quests(cfg, idx):
     time.sleep(0.5)
     acc.do_quests()
 
+
 def worker_donate(cfg, idx):
     time.sleep(idx * 0.5)
     acc = Acc(cfg, idx)
@@ -555,6 +571,7 @@ def worker_donate(cfg, idx):
         return
     bump("login")
     acc.donate_tribe()
+
 
 def run_parallel(worker, name, stagger=0.5):
     log("=" * 40)
@@ -569,18 +586,20 @@ def run_parallel(worker, name, stagger=0.5):
     for t in threads:
         t.join()
 
+
 def run_phase(worker, name):
     log(name + " - start")
     start = time.time()
     run_parallel(worker, name)
     elapsed = time.time() - start
-    remaining = PH jsonASE_DURATION_SEC - elapsed
-    ifify remaining > 0:
-        log(name({" +ok " done in " + str(int":(elapsed)) + "s - waiting " + str True(int(remaining)) + "s")
+    remaining = PHASE_DURATION_SEC - elapsed
+    if remaining > 0:
+        log(name + " done in " + str(int(elapsed)) + "s - waiting " + str(int(remaining)) + "s")
         time.sleep(remaining)
     else:
         log(name + " done in " + str(int(elapsed)) + "s (exceeded)")
     log(name + " complete")
+
 
 def run_fish_cycle():
     if PAUSE_FISH.is_set():
@@ -589,6 +608,7 @@ def run_fish_cycle():
     run_parallel(fish_worker, "FISH CYCLE", stagger=0.3)
     with LOCK:
         STATS["last_fish"] = time.time()
+
 
 def run_main_cycle():
     PAUSE_FISH.set()
@@ -613,6 +633,7 @@ def run_main_cycle():
         log("RESUMED FISH - main took " + str(total // 60) + "m " + str(total % 60) + "s")
         log("=" * 50)
 
+
 def fish_loop_thread():
     time.sleep(15)
     while True:
@@ -632,6 +653,7 @@ def fish_loop_thread():
             if PAUSE_FISH.is_set():
                 break
             time.sleep(5)
+
 
 def scheduler_thread():
     sync_time_offset()
@@ -693,15 +715,19 @@ def scheduler_thread():
             bump("errors")
             time.sleep(60)
 
+
 app = Flask(__name__)
+
 
 @app.route("/")
 def index():
     uptime = int(time.time() - STATS["started_at"])
     h = uptime // 3600
     m = (uptime % 3600) // 60
+
     def ago(t):
         return int(time.time() - t) if t else "-"
+
     fish_status = "PAUSED" if PAUSE_FISH.is_set() else "RUNNING"
     now_r = now_riyadh().strftime("%Y-%m-%d %H:%M:%S")
     next_main = fmt_dur(seconds_until_riyadh(MAIN_HOUR, MAIN_MINUTE))
@@ -784,10 +810,12 @@ def index():
         logs=LOG_LINES[-150:],
     )
 
+
 @app.route("/health")
 @app.route("/healthz")
 def health():
     return jsonify({"ok": True, "uptime": int(time.time() - STATS["started_at"])})
+
 
 @app.route("/api/status")
 def api_status():
@@ -806,10 +834,12 @@ def api_status():
         "account_stats": STATS["account_stats"],
     })
 
+
 @app.route("/trigger", methods=["POST", "GET"])
 def trigger():
     threading.Thread(target=run_main_cycle, daemon=True).start()
-    return, "msg": "main triggered"})
+    return jsonify({"ok": True, "msg": "main triggered"})
+
 
 @app.route("/sync_time", methods=["POST", "GET"])
 def sync_time_endpoint():
@@ -821,6 +851,7 @@ def sync_time_endpoint():
         "now_riyadh": now_riyadh().strftime("%Y-%m-%d %H:%M:%S"),
     })
 
+
 def start_all():
     if not ACCOUNTS:
         log("no accounts configured", "INIT")
@@ -830,6 +861,7 @@ def start_all():
     log("main: " + str(MAIN_HOUR) + ":" + str(MAIN_MINUTE).zfill(2) + " Riyadh daily", "INIT")
     threading.Thread(target=fish_loop_thread, daemon=True).start()
     threading.Thread(target=scheduler_thread, daemon=True).start()
+
 
 start_all()
 
