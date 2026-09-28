@@ -4,14 +4,16 @@ from flask import Flask, jsonify, render_template_string
 
 API = "https://qjwbfkpudysxqtkeouwu.supabase.co"
 KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFqd2Jma3B1ZHlzeHF0a2VvdXd1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk3NDEyNDksImV4cCI6MjA5NTMxNzI0OX0.rs4NXx8bMPQ3k8Zgf_F3efeDPuAsxPlqS0bZ3cFE9dI"
+TIME_FALLBACK_URL = "http://worldtimeapi.org/api/timezone/Asia/Riyadh"
 
 FISH_INTERVAL_SECONDS = int(os.environ.get("FISH_INTERVAL_SECONDS", "660"))
-MAIN_INTERVAL_HOURS   = int(os.environ.get("MAIN_INTERVAL_HOURS", "20"))
-MAIN_INTERVAL_SECONDS = MAIN_INTERVAL_HOURS * 3600
 PHASE_DURATION_SEC    = int(os.environ.get("PHASE_DURATION_SEC", "300"))
 
 MAIN_ENABLED = os.environ.get("MAIN_ENABLED", "1") == "1"
 FISH_ENABLED = os.environ.get("FISH_ENABLED", "1") == "1"
+
+MAIN_HOUR = int(os.environ.get("MAIN_HOUR", "20"))
+MAIN_MINUTE = int(os.environ.get("MAIN_MINUTE", "25"))
 
 MIN_HP_PCT       = 0.3
 BUY_ROCKET_COUNT = int(os.environ.get("BUY_ROCKET_COUNT", "30"))
@@ -26,6 +28,8 @@ USER_AGENTS = [
 ]
 
 PAUSE_FISH = threading.Event()
+TIME_OFFSET = timedelta(0)
+TIME_OFFSET_LOCK = threading.Lock()
 
 def load_accounts():
     accounts = []
@@ -47,6 +51,7 @@ STATS = {
     "collected": 0, "sold": 0,
     "fish_cycles": 0, "main_cycles": 0,
     "last_fish": None, "last_main": None, "last_run": None,
+    "time_offset_sec": 0, "time_source": "local",
     "errors": 0,
     "account_stats": {},
 }
@@ -80,8 +85,76 @@ def acc_bump(email, k, n=1):
             }
         STATS["account_stats"][email][k] = STATS["account_stats"][email].get(k, 0) + n
 
+def sync_time_offset():
+    global TIME_OFFSET
+    try:
+        r = requests.post(API + "/rest/v1/rpc/get_server_time",
+            headers={"apikey": KEY, "Content-Type": "application/json"},
+            json={}, timeout=10)
+        if r.status_code == 200:
+            data = r.json()
+            if isinstance(data, list) and data:
+                data = data[0]
+            if isinstance(data, dict):
+                sn = data.get("server_now")
+                if sn:
+                    server_utc = dt.fromisoformat(sn.replace("Z", "+00:00"))
+                    local_utc = dt.now(timezone.utc)
+                    with TIME_OFFSET_LOCK:
+                        TIME_OFFSET = server_utc - local_utc
+                    with LOCK:
+                        STATS["time_offset_sec"] = int(TIME_OFFSET.total_seconds())
+                        STATS["time_source"] = "game_server"
+                    return True
+    except Exception as e:
+        log("game time err: " + str(e)[:60], "TIME")
+
+    try:
+        r = requests.get(TIME_FALLBACK_URL, timeout=10)
+        if r.status_code == 200:
+            data = r.json()
+            server_str = data.get("datetime")
+            if server_str:
+                server_time = dt.fromisoformat(server_str.replace("Z", "+00:00"))
+                server_utc = server_time.astimezone(timezone.utc)
+                local_utc = dt.now(timezone.utc)
+                with TIME_OFFSET_LOCK:
+                    TIME_OFFSET = server_utc - local_utc
+                with LOCK:
+                    STATS["time_offset_sec"] = int(TIME_OFFSET.total_seconds())
+                    STATS["time_source"] = "worldtimeapi"
+                return True
+    except Exception as e:
+        log("fallback time err: " + str(e)[:60], "TIME")
+
+    with LOCK:
+        STATS["time_source"] = "local"
+    return False
+
+def now_utc():
+    with TIME_OFFSET_LOCK:
+        return dt.now(timezone.utc) + TIME_OFFSET
+
+def now_riyadh():
+    return now_utc() + timedelta(hours=3)
+
 def riyadh_date():
-    return (dt.now(timezone.utc) + timedelta(hours=3)).strftime("%Y-%m-%d")
+    return now_riyadh().strftime("%Y-%m-%d")
+
+def seconds_until_riyadh(hour, minute):
+    now = now_riyadh()
+    target = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
+    if target <= now:
+        target += timedelta(days=1)
+    return (target - now).total_seconds()
+
+def fmt_dur(sec):
+    sec = int(sec)
+    h = sec // 3600
+    m = (sec % 3600) // 60
+    if h > 0:
+        return str(h) + "h " + str(m) + "m"
+    return str(m) + "m"
 
 class Acc:
     def __init__(self, cfg, idx):
@@ -501,9 +574,9 @@ def run_phase(worker, name):
     start = time.time()
     run_parallel(worker, name)
     elapsed = time.time() - start
-    remaining = PHASE_DURATION_SEC - elapsed
-    if remaining > 0:
-        log(name + " done in " + str(int(elapsed)) + "s - waiting " + str(int(remaining)) + "s")
+    remaining = PH jsonASE_DURATION_SEC - elapsed
+    ifify remaining > 0:
+        log(name({" +ok " done in " + str(int":(elapsed)) + "s - waiting " + str True(int(remaining)) + "s")
         time.sleep(remaining)
     else:
         log(name + " done in " + str(int(elapsed)) + "s (exceeded)")
@@ -561,18 +634,64 @@ def fish_loop_thread():
             time.sleep(5)
 
 def scheduler_thread():
-    time.sleep(5)
+    sync_time_offset()
+    log("main scheduler - target " + str(MAIN_HOUR) + ":" + str(MAIN_MINUTE).zfill(2) + " Riyadh", "INIT")
+    last_resync = time.time()
+    last_run_date = None
+
     while True:
         try:
+            if time.time() - last_resync > 3600:
+                sync_time_offset()
+                last_resync = time.time()
+
+            now_r = now_riyadh()
+            today = now_r.strftime("%Y-%m-%d")
+
+            if last_run_date == today:
+                wait_sec = seconds_until_riyadh(MAIN_HOUR, MAIN_MINUTE)
+            else:
+                target = now_r.replace(hour=MAIN_HOUR, minute=MAIN_MINUTE, second=0, microsecond=0)
+                if target <= now_r:
+                    wait_sec = (target + timedelta(days=1) - now_r).total_seconds()
+                else:
+                    wait_sec = (target - now_r).total_seconds()
+
+            log("next main in " + fmt_dur(wait_sec) + " (now " + now_r.strftime("%H:%M:%S") + " Riyadh)", "SCHED")
+
+            end = time.time() + wait_sec
+            while time.time() < end:
+                chunk = min(300, end - time.time())
+                if chunk <= 0:
+                    break
+                time.sleep(chunk)
+                if time.time() - last_resync > 3600:
+                    sync_time_offset()
+                    last_resync = time.time()
+                    rem = seconds_until_riyadh(MAIN_HOUR, MAIN_MINUTE)
+                    end = time.time() + rem
+
+            now_r = now_riyadh()
+            today = now_r.strftime("%Y-%m-%d")
+
+            if last_run_date == today:
+                log("main already ran today - wait next cycle", "SCHED")
+                time.sleep(60)
+                continue
+
             if MAIN_ENABLED:
+                log("TRIGGERING MAIN at " + now_r.strftime("%H:%M:%S") + " Riyadh", "SCHED")
                 run_main_cycle()
+                last_run_date = today
+                time.sleep(120)
+            else:
+                last_run_date = today
+                time.sleep(60)
+
         except Exception as e:
             log("scheduler err: " + str(e)[:150])
             bump("errors")
-        log("next main in " + str(MAIN_INTERVAL_HOURS) + "h")
-        end = time.time() + MAIN_INTERVAL_SECONDS
-        while time.time() < end:
-            time.sleep(30)
+            time.sleep(60)
 
 app = Flask(__name__)
 
@@ -584,10 +703,12 @@ def index():
     def ago(t):
         return int(time.time() - t) if t else "-"
     fish_status = "PAUSED" if PAUSE_FISH.is_set() else "RUNNING"
+    now_r = now_riyadh().strftime("%Y-%m-%d %H:%M:%S")
+    next_main = fmt_dur(seconds_until_riyadh(MAIN_HOUR, MAIN_MINUTE))
     html = """
     <!DOCTYPE html><html lang="ar" dir="rtl"><head>
     <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-    <title>CIPHER UNIFIED v3</title><style>
+    <title>CIPHER v6</title><style>
     *{box-sizing:border-box;margin:0;padding:0}
     body{font-family:-apple-system,sans-serif;background:#0a0e1a;color:#e0e0e0;padding:20px}
     h1{color:#fbbf24;margin-bottom:20px;font-size:24px}
@@ -597,12 +718,16 @@ def index():
     .card .value{font-size:22px;font-weight:bold;color:#fbbf24}
     .log{background:#000;border-radius:8px;padding:14px;font-family:monospace;font-size:11px;max-height:500px;overflow-y:auto}
     .log div{padding:2px 0;border-bottom:1px solid #111}
-    .green{color:#4ade80}.red{color:#f87171}.yellow{color:#fbbf24}
+    .green{color:#4ade80}.red{color:#f87171}.yellow{color:#fbbf24}.blue{color:#60a5fa}
     </style></head><body>
-    <h1>CIPHER UNIFIED v3</h1>
+    <h1>CIPHER UNIFIED v6</h1>
     <p style="color:#9ca3af;margin-bottom:20px;">
       Accounts: {{ acc_count }} | Uptime: {{ h }}h {{ m }}m<br>
-      Fish: every {{ fish_int }}s | Main: every {{ main_int }}h<br>
+      Fish: every {{ fish_int }}s<br>
+      <b class="blue">Main: {{ main_time }} Riyadh daily</b><br>
+      <b class="blue">Next main in: {{ next_main }}</b><br>
+      Now Riyadh: <b>{{ now_riyadh }}</b><br>
+      Time Source: <b class="yellow">{{ time_source }}</b> | Offset: {{ time_offset }}s<br>
       Fish Status: <b class="yellow">{{ fish_status }}</b>
     </p>
     <div class="grid">
@@ -633,7 +758,11 @@ def index():
         acc_count=len(ACCOUNTS),
         h=h, m=m,
         fish_int=FISH_INTERVAL_SECONDS,
-        main_int=MAIN_INTERVAL_HOURS,
+        main_time=str(MAIN_HOUR) + ":" + str(MAIN_MINUTE).zfill(2),
+        next_main=next_main,
+        now_riyadh=now_r,
+        time_source=STATS.get("time_source", "local"),
+        time_offset=STATS.get("time_offset_sec", 0),
         fish_status=fish_status,
         fish_cycles=STATS["fish_cycles"],
         main_cycles=STATS["main_cycles"],
@@ -665,8 +794,13 @@ def api_status():
     return jsonify({
         "accounts": len(ACCOUNTS),
         "fish_interval": FISH_INTERVAL_SECONDS,
-        "main_interval_hours": MAIN_INTERVAL_HOURS,
+        "main_hour": MAIN_HOUR,
+        "main_minute": MAIN_MINUTE,
         "phase_duration": PHASE_DURATION_SEC,
+        "now_riyadh": now_riyadh().strftime("%Y-%m-%d %H:%M:%S"),
+        "next_main_in_sec": int(seconds_until_riyadh(MAIN_HOUR, MAIN_MINUTE)),
+        "time_source": STATS.get("time_source", "local"),
+        "time_offset_sec": STATS.get("time_offset_sec", 0),
         "fish_paused": PAUSE_FISH.is_set(),
         "stats": {k: v for k, v in STATS.items() if k != "account_stats"},
         "account_stats": STATS["account_stats"],
@@ -675,7 +809,17 @@ def api_status():
 @app.route("/trigger", methods=["POST", "GET"])
 def trigger():
     threading.Thread(target=run_main_cycle, daemon=True).start()
-    return jsonify({"ok": True, "msg": "main triggered"})
+    return, "msg": "main triggered"})
+
+@app.route("/sync_time", methods=["POST", "GET"])
+def sync_time_endpoint():
+    ok = sync_time_offset()
+    return jsonify({
+        "ok": ok,
+        "time_source": STATS.get("time_source"),
+        "time_offset_sec": STATS.get("time_offset_sec"),
+        "now_riyadh": now_riyadh().strftime("%Y-%m-%d %H:%M:%S"),
+    })
 
 def start_all():
     if not ACCOUNTS:
@@ -683,7 +827,7 @@ def start_all():
         return
     log("start " + str(len(ACCOUNTS)) + " accounts", "INIT")
     log("fish: every " + str(FISH_INTERVAL_SECONDS) + "s", "INIT")
-    log("main: every " + str(MAIN_INTERVAL_HOURS) + "h", "INIT")
+    log("main: " + str(MAIN_HOUR) + ":" + str(MAIN_MINUTE).zfill(2) + " Riyadh daily", "INIT")
     threading.Thread(target=fish_loop_thread, daemon=True).start()
     threading.Thread(target=scheduler_thread, daemon=True).start()
 
