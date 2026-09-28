@@ -1,14 +1,23 @@
-import os, sys, json, time, random, threading, requests, re
-from datetime import datetime as dt, timedelta, timezone
-from flask import Flask, jsonify, render_template_string
+import os
+import sys
+import json
+import time
+import random
+import threading
+import requests
+import re
+from datetime import datetime as dt
+from datetime import timedelta
+from datetime import timezone
+from flask import Flask
+from flask import jsonify
+from flask import render_template_string
 
 API = "https://qjwbfkpudysxqtkeouwu.supabase.co"
 KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFqd2Jma3B1ZHlzeHF0a2VvdXd1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk3NDEyNDksImV4cCI6MjA5NTMxNzI0OX0.rs4NXx8bMPQ3k8Zgf_F3efeDPuAsxPlqS0bZ3cFE9dI"
 TIME_FALLBACK_URL = "http://worldtimeapi.org/api/timezone/Asia/Riyadh"
 
 FISH_INTERVAL_SECONDS = int(os.environ.get("FISH_INTERVAL_SECONDS", "660"))
-PHASE_DURATION_SEC = int(os.environ.get("PHASE_DURATION_SEC", "300"))
-
 MAIN_ENABLED = os.environ.get("MAIN_ENABLED", "1") == "1"
 FISH_ENABLED = os.environ.get("FISH_ENABLED", "1") == "1"
 
@@ -46,13 +55,24 @@ ACCOUNTS = load_accounts()
 LOCK = threading.Lock()
 STATS = {
     "started_at": time.time(),
-    "login": 0, "login_fail": 0,
-    "daily": 0, "quest_ok": 0, "free": 0, "bought": 0,
-    "attacked": 0, "damage": 0, "donated": 0,
-    "collected": 0, "sold": 0,
-    "fish_cycles": 0, "main_cycles": 0,
-    "last_fish": None, "last_main": None, "last_run": None,
-    "time_offset_sec": 0, "time_source": "local",
+    "login": 0,
+    "login_fail": 0,
+    "daily": 0,
+    "quest_ok": 0,
+    "free": 0,
+    "bought": 0,
+    "attacked": 0,
+    "damage": 0,
+    "donated": 0,
+    "collected": 0,
+    "sold": 0,
+    "fish_cycles": 0,
+    "main_cycles": 0,
+    "last_fish": None,
+    "last_main": None,
+    "last_run": None,
+    "time_offset_sec": 0,
+    "time_source": "local",
     "errors": 0,
     "account_stats": {},
 }
@@ -84,8 +104,11 @@ def acc_bump(email, k, n=1):
     with LOCK:
         if email not in STATS["account_stats"]:
             STATS["account_stats"][email] = {
-                "gems": 0, "coins": 0, "fish": 0,
-                "damage": 0, "donated": 0,
+                "gems": 0,
+                "coins": 0,
+                "fish": 0,
+                "damage": 0,
+                "donated": 0,
             }
         STATS["account_stats"][email][k] = STATS["account_stats"][email].get(k, 0) + n
 
@@ -200,7 +223,11 @@ class Acc:
                 time.sleep(random.uniform(0.3, 0.9))
                 r = self.s.post(
                     API + "/auth/v1/token?grant_type=password",
-                    headers={"apikey": KEY, "Content-Type": "application/json", "User-Agent": self.ua},
+                    headers={
+                        "apikey": KEY,
+                        "Content-Type": "application/json",
+                        "User-Agent": self.ua,
+                    },
                     json={"email": self.email, "password": self.pw},
                     timeout=30,
                 )
@@ -241,7 +268,7 @@ class Acc:
                     self.refresh = d.get("refresh_token", self.refresh)
                     self.expires = time.time() + d.get("expires_in", 3600) - 300
                     return True
-            except:
+            except Exception:
                 pass
         return self.login()
 
@@ -280,15 +307,17 @@ class Acc:
             return
         try:
             meta = {q["id"]: q for q in json.loads(tx)}
-        except:
+        except Exception:
             return
         tk = riyadh_date()
-        st, tx = self.get("quest_progress?select=*&user_id=eq." + self.uid + "&day_key=eq." + tk)
+        st, tx = self.get(
+            "quest_progress?select=*&user_id=eq." + self.uid + "&day_key=eq." + tk
+        )
         if st != 200:
             return
         try:
             prog = json.loads(tx)
-        except:
+        except Exception:
             return
         for p in prog:
             if p.get("claimed"):
@@ -307,7 +336,7 @@ class Acc:
                     log("quest " + title + " +" + str(g) + "g +" + str(c) + "c", self.short)
                     acc_bump(self.email, "gems", g)
                     acc_bump(self.email, "coins", c)
-                except:
+                except Exception:
                     log("quest " + title, self.short)
                 bump("quest_ok")
             time.sleep(random.uniform(0.5, 1.0))
@@ -336,7 +365,7 @@ class Acc:
             elif "rocket_daily_limit" in tx:
                 try:
                     rem = int(tx.split("rocket_daily_limit:")[1].split(":")[0])
-                except:
+                except Exception:
                     rem = 0
                 if rem > 0:
                     st2, _ = self.rpc("buy_with_coins", {
@@ -366,7 +395,7 @@ class Acc:
         try:
             arr = json.loads(tx)
             return arr[0] if arr else None
-        except:
+        except Exception:
             return None
 
     def attack_boss(self, times=None):
@@ -381,26 +410,29 @@ class Acc:
             try:
                 j = json.loads(tx)
                 remaining = min(times, j.get("remaining", times))
-            except:
+            except Exception:
                 pass
         if remaining <= 0:
             return
         ship = self.top_ship()
         if not ship:
             return
-        if (ship.get("hp") or 0) / (ship.get("max_hp") or 1) <, MIN_HP_PCT:
+        hp = ship.get("hp") or 0
+        mx = ship.get("max_hp") or 1
+        if hp / mx < MIN_HP_PCT:
             return
-        ship _id = ship["id"]
-        hits =0 0
+        ship_id = ship["id"]
+        hits = 0
         dmg_total = 0
-
         for i in range(remaining):
-            st       , tx = self.get("ships try_owned?select=hp,max_hp&id=eq." + ship_id)
+            st, tx = self.get("ships_owned?select=hp,max_hp&id=eq." + ship_id)
             try:
                 cur = json.loads(tx)[0]
-                if (cur.get("hp") or 0) / (cur.get("max_hp") or 1) < MIN_HP_PCT:
+                chp = cur.get("hp") or 0
+                cmx = cur.get("max_hp") or 1
+                if chp / cmx < MIN_HP_PCT:
                     break
-            except:
+            except Exception:
                 pass
             st, tx = self.rpc("attack_boss_with", {"p_weapon": "rocket_large"})
             if st == 200:
@@ -408,7 +440,7 @@ class Acc:
                 try:
                     j = json.loads(tx)
                     dmg_total += j.get("damage", 0)
-                except:
+                except Exception:
                     pass
             else:
                 break
@@ -427,7 +459,7 @@ class Acc:
             p = json.loads(tx)[0]
             tid = p.get("tribe_id")
             coins = p.get("coins") or 0
-        except:
+        except Exception:
             return
         if not tid:
             log("no tribe", self.short)
@@ -447,9 +479,10 @@ class Acc:
             "&user_id=eq." + self.uid + "&in_storage=eq.false"
         )
         if st != 200:
-            return 0, 0:
+            return 0, 0, 0
+        try:
             ships = json.loads(tx)
-        except:
+        except Exception:
             return 0, 0, 0
         at_sea = [s for s in ships if s.get("at_sea")]
         collected = 0
@@ -470,7 +503,7 @@ class Acc:
                         total_fish += qty
                         fid = arr[0].get("fish_id", "?")
                         log("collect " + str(s.get("catalog_code")) + " " + str(qty) + "x" + fid, self.short)
-                except:
+                except Exception:
                     pass
             self.rpc("set_ship_at_sea", {"_ship_id": s["id"], "_at_sea": False})
             time.sleep(random.uniform(0.3, 0.7))
@@ -480,7 +513,7 @@ class Acc:
         if st == 200:
             try:
                 stock = json.loads(tx)
-            except:
+            except Exception:
                 stock = []
             for item in stock:
                 fid = item.get("fish_id")
@@ -505,7 +538,7 @@ class Acc:
         if st == 200:
             try:
                 ships2 = json.loads(tx)
-            except:
+            except Exception:
                 ships2 = []
             for s in ships2:
                 if s.get("at_sea"):
@@ -587,7 +620,7 @@ def run_parallel(worker, name, stagger=0.5):
 
 
 def run_phase(worker, name):
-    log(name + " - start")
+    log(name + " start")
     start = time.time()
     run_parallel(worker, name)
     elapsed = time.time() - start
@@ -636,7 +669,7 @@ def fish_loop_thread():
 
 def scheduler_thread():
     sync_time_offset()
-    log("main scheduler - target " + str(MAIN_HOUR) + ":" + str(MAIN_MINUTE).zfill(2) + " Riyadh", "INIT")
+    log("main scheduler target " + str(MAIN_HOUR) + ":" + str(MAIN_MINUTE).zfill(2) + " Riyadh", "INIT")
     last_resync = time.time()
     last_run_date = None
 
@@ -676,7 +709,7 @@ def scheduler_thread():
             today = now_r.strftime("%Y-%m-%d")
 
             if last_run_date == today:
-                log("main already ran today - wait next cycle", "SCHED")
+                log("main already ran today", "SCHED")
                 time.sleep(60)
                 continue
 
@@ -709,6 +742,7 @@ def index():
 
     now_r = now_riyadh().strftime("%Y-%m-%d %H:%M:%S")
     next_main = fmt_dur(seconds_until_riyadh(MAIN_HOUR, MAIN_MINUTE))
+
     html = """
     <!DOCTYPE html><html lang="ar" dir="rtl"><head>
     <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
@@ -759,7 +793,8 @@ def index():
     return render_template_string(
         html,
         acc_count=len(ACCOUNTS),
-        h=h, m=m,
+        h=h,
+        m=m,
         fish_int=FISH_INTERVAL_SECONDS,
         main_time=str(MAIN_HOUR) + ":" + str(MAIN_MINUTE).zfill(2),
         next_main=next_main,
