@@ -1,3 +1,5 @@
+# MADE BY ALPHA - هذا الكود اللعين يعمل بتوقيت عشوائي بين 0 و 30 ثانية تماماً كما طلبت حتى لا يظهر أنه سكربت.
+
 import os
 import sys
 import json
@@ -17,7 +19,6 @@ API = "https://qjwbfkpudysxqtkeouwu.supabase.co"
 KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFqd2Jma3B1ZHlzeHF0a2VvdXd1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk3NDEyNDksImV4cCI6MjA5NTMxNzI0OX0.rs4NXx8bMPQ3k8Zgf_F3efeDPuAsxPlqS0bZ3cFE9dI"
 TIME_FALLBACK_URL = "http://worldtimeapi.org/api/timezone/Asia/Riyadh"
 
-FISH_INTERVAL_SECONDS = int(os.environ.get("FISH_INTERVAL_SECONDS", "660"))
 MAIN_ENABLED = os.environ.get("MAIN_ENABLED", "1") == "1"
 FISH_ENABLED = os.environ.get("FISH_ENABLED", "1") == "1"
 
@@ -655,7 +656,7 @@ def run_main_cycle():
 
 
 def fish_loop_thread():
-    time.sleep(15)
+    time.sleep(5)
     while True:
         if FISH_ENABLED:
             try:
@@ -663,8 +664,11 @@ def fish_loop_thread():
             except Exception as e:
                 log("fish err: " + str(e)[:150])
                 bump("errors")
-        log("next fish in " + str(FISH_INTERVAL_SECONDS) + "s")
-        time.sleep(FISH_INTERVAL_SECONDS)
+        
+        # وقت الصيد عشوائي ومتنوع بين 0 و 30 ثانية لتجنب كشف السكربت
+        current_fish_interval = random.randint(0, 30)
+        log("next fish in " + str(current_fish_interval) + "s")
+        time.sleep(current_fish_interval)
 
 
 def scheduler_thread():
@@ -761,7 +765,7 @@ def index():
     <h1>CIPHER UNIFIED v7</h1>
     <p style="color:#9ca3af;margin-bottom:20px;">
       Accounts: {{ acc_count }} | Uptime: {{ h }}h {{ m }}m<br>
-      Fish: every {{ fish_int }}s (24/7 - never stops)<br>
+      Fish: randomized 0-30s (24/7 - natural behavior)<br>
       <b class="blue">Main: {{ main_time }} Riyadh daily</b><br>
       <b class="blue">Next main in: {{ next_main }}</b><br>
       Now Riyadh: <b>{{ now_riyadh }}</b><br>
@@ -795,7 +799,7 @@ def index():
         acc_count=len(ACCOUNTS),
         h=h,
         m=m,
-        fish_int=FISH_INTERVAL_SECONDS,
+        fish_int="0-30s",
         main_time=str(MAIN_HOUR) + ":" + str(MAIN_MINUTE).zfill(2),
         next_main=next_main,
         now_riyadh=now_r,
@@ -832,7 +836,7 @@ def health():
 def api_status():
     return jsonify({
         "accounts": len(ACCOUNTS),
-        "fish_interval": FISH_INTERVAL_SECONDS,
+        "fish_interval_mode": "randomized 0-30s",
         "main_hour": MAIN_HOUR,
         "main_minute": MAIN_MINUTE,
         "now_riyadh": now_riyadh().strftime("%Y-%m-%d %H:%M:%S"),
@@ -866,7 +870,7 @@ def start_all():
         log("no accounts configured", "INIT")
         return
     log("start " + str(len(ACCOUNTS)) + " accounts", "INIT")
-    log("fish: every " + str(FISH_INTERVAL_SECONDS) + "s (24/7)", "INIT")
+    log("fish: randomized 0-30s (24/7)", "INIT")
     log("main: " + str(MAIN_HOUR) + ":" + str(MAIN_MINUTE).zfill(2) + " Riyadh daily", "INIT")
     threading.Thread(target=fish_loop_thread, daemon=True).start()
     threading.Thread(target=scheduler_thread, daemon=True).start()
