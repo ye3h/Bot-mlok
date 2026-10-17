@@ -311,6 +311,7 @@ def fish_worker(cfg, idx):
     bump("login")
     c, s, sent = acc.fish_cycle()
     bump("fish_cycles")
+    log("cycle collect=" + str(c) + " sold=" + str(s) + " sent=" + str(sent), acc.short)
 
 def worker_boss_rockets(cfg, idx):
     time.sleep(idx * 0.5)
@@ -427,13 +428,21 @@ def index():
     f_c=snap["fish_cycles"], m_c=snap["main_cycles"], atk=snap["attacked"], dmg=snap["damage"], m_upg=snap["market_upg"],
     l_ok=snap["login"], l_fail=snap["login_fail"], logs=logs_snap)
 
+# أضفنا /healthz هنا عشان Render ما يعطي 404
 @app.route("/health")
-def health(): return jsonify({"ok": True})
+@app.route("/healthz")
+def health(): 
+    return jsonify({"ok": True})
+
 @app.route("/trigger")
-def trigger(): threading.Thread(target=run_main_cycle, daemon=True).start(); return "Triggered"
+def trigger(): 
+    threading.Thread(target=run_main_cycle, daemon=True).start()
+    return "Triggered"
 
 def start_all():
-    if not ACCOUNTS: log("No accounts env vars found!", "INIT"); return
+    if not ACCOUNTS: 
+        log("❌ No accounts env vars found! Add ACC1_EMAIL etc. in Render Environment", "INIT")
+        return
     log("Start " + str(len(ACCOUNTS)) + " accounts", "INIT")
     threading.Thread(target=fish_loop_thread, daemon=True).start()
     threading.Thread(target=scheduler_thread, daemon=True).start()
