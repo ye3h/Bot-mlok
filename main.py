@@ -1,19 +1,6 @@
-
-
-import os
-import sys
-import json
-import time
-import random
-import threading
-import requests
-import re
-from datetime import datetime as dt
-from datetime import timedelta
-from datetime import timezone
-from flask import Flask
-from flask import jsonify
-from flask import render_template_string
+import os, sys, json, time, random, threading, requests
+from datetime import datetime as dt, timedelta, timezone
+from flask import Flask, jsonify, render_template_string
 
 API = "https://qjwbfkpudysxqtkeouwu.supabase.co"
 KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFqd2Jma3B1ZHlzeHF0a2VvdXd1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk3NDEyNDksImV4cCI6MjA5NTMxNzI0OX0.rs4NXx8bMPQ3k8Zgf_F3efeDPuAsxPlqS0bZ3cFE9dI"
@@ -21,6 +8,7 @@ TIME_FALLBACK_URL = "http://worldtimeapi.org/api/timezone/Asia/Riyadh"
 
 MAIN_ENABLED = os.environ.get("MAIN_ENABLED", "1") == "1"
 FISH_ENABLED = os.environ.get("FISH_ENABLED", "1") == "1"
+MARKET_ENABLED = os.environ.get("MARKET_ENABLED", "1") == "1"
 
 MAIN_HOUR = int(os.environ.get("MAIN_HOUR", "20"))
 MAIN_MINUTE = int(os.environ.get("MAIN_MINUTE", "25"))
@@ -30,16 +18,17 @@ BUY_ROCKET_COUNT = int(os.environ.get("BUY_ROCKET_COUNT", "30"))
 BOSS_ATTACKS = int(os.environ.get("BOSS_ATTACKS", "5"))
 DONATE_AMOUNT = int(os.environ.get("DONATE_AMOUNT", "10000"))
 CV = "fish-market-v20260626-force-update-1"
+MARKET_RPC = "market_start_upgrade"
 
 USER_AGENTS = [
     "Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.7 Mobile/15E148 Safari/604.1",
     "Mozilla/5.0 (iPhone; CPU iPhone OS 18_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.6 Mobile/15E148 Safari/604.1",
-    "Mozilla/5.0 (iPhone; CPU iPhone OS 17_7 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.7 Mobile/15E148 Safari/604.1",
 ]
 
 TIME_OFFSET = timedelta(0)
 TIME_OFFSET_LOCK = threading.Lock()
-
+MAIN_RUN_LOCK = threading.Lock()
+LAST_MAIN_RUN_DATE = None
 
 def load_accounts():
     accounts = []
@@ -50,834 +39,406 @@ def load_accounts():
             accounts.append({"email": e, "password": p})
     return accounts
 
-
 ACCOUNTS = load_accounts()
 
 LOCK = threading.Lock()
 STATS = {
-    "started_at": time.time(),
-    "login": 0,
-    "login_fail": 0,
-    "daily": 0,
-    "quest_ok": 0,
-    "free": 0,
-    "bought": 0,
-    "attacked": 0,
-    "damage": 0,
-    "donated": 0,
-    "collected": 0,
-    "sold": 0,
-    "fish_cycles": 0,
-    "main_cycles": 0,
-    "last_fish": None,
-    "last_main": None,
-    "last_run": None,
-    "time_offset_sec": 0,
-    "time_source": "local",
-    "errors": 0,
-    "account_stats": {},
+    "started_at": time.time(), "login": 0, "login_fail": 0, "daily": 0,
+    "quest_ok": 0, "free": 0, "bought": 0, "attacked": 0, "damage": 0,
+    "donated": 0, "collected": 0, "sold": 0, "market_upg": 0, "fish_cycles": 0,
+    "main_cycles": 0, "last_fish": None, "last_main": None, "last_run": None,
+    "time_offset_sec": 0, "time_source": "local", "errors": 0, "account_stats": {}
 }
 
 LOG_LINES = []
 LOG_LOCK = threading.Lock()
 
-
 def log(msg, tag=""):
     ts = dt.now().strftime("%H:%M:%S")
     p = "[" + ts + "]"
-    if tag:
-        p += "[" + tag[:8] + "]"
+    if tag: p += "[" + tag[:8] + "]"
     line = p + " " + msg
     with LOG_LOCK:
-        print(line)
-        sys.stdout.flush()
+        print(line); sys.stdout.flush()
         LOG_LINES.append(line)
-        if len(LOG_LINES) > 500:
-            LOG_LINES.pop(0)
-
+        if len(LOG_LINES) > 500: LOG_LINES.pop(0)
 
 def bump(k, n=1):
-    with LOCK:
-        STATS[k] = STATS.get(k, 0) + n
-
+    with LOCK: STATS[k] = STATS.get(k, 0) + n
 
 def acc_bump(email, k, n=1):
     with LOCK:
         if email not in STATS["account_stats"]:
-            STATS["account_stats"][email] = {
-                "gems": 0,
-                "coins": 0,
-                "fish": 0,
-                "damage": 0,
-                "donated": 0,
-            }
+            STATS["account_stats"][email] = {"gems": 0, "coins": 0, "fish": 0, "damage": 0, "donated": 0}
         STATS["account_stats"][email][k] = STATS["account_stats"][email].get(k, 0) + n
-
 
 def sync_time_offset():
     global TIME_OFFSET
     try:
-        r = requests.post(API + "/rest/v1/rpc/get_server_time",
-            headers={"apikey": KEY, "Content-Type": "application/json"},
-            json={}, timeout=10)
+        r = requests.post(API + "/rest/v1/rpc/get_server_time", headers={"apikey": KEY, "Content-Type": "application/json"}, json={}, timeout=10)
         if r.status_code == 200:
             data = r.json()
-            if isinstance(data, list) and data:
-                data = data[0]
-            if isinstance(data, dict):
-                sn = data.get("server_now")
-                if sn:
-                    server_utc = dt.fromisoformat(sn.replace("Z", "+00:00"))
-                    local_utc = dt.now(timezone.utc)
-                    with TIME_OFFSET_LOCK:
-                        TIME_OFFSET = server_utc - local_utc
-                    with LOCK:
-                        STATS["time_offset_sec"] = int(TIME_OFFSET.total_seconds())
-                        STATS["time_source"] = "game_server"
-                    return True
-    except Exception as e:
-        log("game time err: " + str(e)[:60], "TIME")
+            if isinstance(data, list) and data: data = data[0]
+            if isinstance(data, dict) and data.get("server_now"):
+                server_utc = dt.fromisoformat(data["server_now"].replace("Z", "+00:00"))
+                with TIME_OFFSET_LOCK: TIME_OFFSET = server_utc - dt.now(timezone.utc)
+                with LOCK: STATS["time_offset_sec"] = int(TIME_OFFSET.total_seconds()); STATS["time_source"] = "game_server"
+                return True
+    except Exception: pass
 
     try:
         r = requests.get(TIME_FALLBACK_URL, timeout=10)
         if r.status_code == 200:
-            data = r.json()
-            server_str = data.get("datetime")
+            server_str = r.json().get("datetime")
             if server_str:
-                server_time = dt.fromisoformat(server_str.replace("Z", "+00:00"))
-                server_utc = server_time.astimezone(timezone.utc)
-                local_utc = dt.now(timezone.utc)
-                with TIME_OFFSET_LOCK:
-                    TIME_OFFSET = server_utc - local_utc
-                with LOCK:
-                    STATS["time_offset_sec"] = int(TIME_OFFSET.total_seconds())
-                    STATS["time_source"] = "worldtimeapi"
+                server_utc = dt.fromisoformat(server_str.replace("Z", "+00:00")).astimezone(timezone.utc)
+                with TIME_OFFSET_LOCK: TIME_OFFSET = server_utc - dt.now(timezone.utc)
+                with LOCK: STATS["time_offset_sec"] = int(TIME_OFFSET.total_seconds()); STATS["time_source"] = "worldtimeapi"
                 return True
-    except Exception as e:
-        log("fallback time err: " + str(e)[:60], "TIME")
-
-    with LOCK:
-        STATS["time_source"] = "local"
+    except Exception: pass
+    with LOCK: STATS["time_source"] = "local"
     return False
 
-
 def now_utc():
-    with TIME_OFFSET_LOCK:
-        return dt.now(timezone.utc) + TIME_OFFSET
-
-
-def now_riyadh():
-    return now_utc() + timedelta(hours=3)
-
-
-def riyadh_date():
-    return now_riyadh().strftime("%Y-%m-%d")
-
+    with TIME_OFFSET_LOCK: return dt.now(timezone.utc) + TIME_OFFSET
+def now_riyadh(): return now_utc() + timedelta(hours=3)
+def riyadh_date(): return now_riyadh().strftime("%Y-%m-%d")
 
 def seconds_until_riyadh(hour, minute):
     now = now_riyadh()
     target = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
-    if target <= now:
-        target += timedelta(days=1)
+    if target <= now: target += timedelta(days=1)
     return (target - now).total_seconds()
 
-
 def fmt_dur(sec):
-    sec = int(sec)
-    h = sec // 3600
-    m = (sec % 3600) // 60
-    if h > 0:
-        return str(h) + "h " + str(m) + "m"
-    return str(m) + "m"
-
+    sec = int(sec); h = sec // 3600; m = (sec % 3600) // 60
+    return str(h) + "h " + str(m) + "m" if h > 0 else str(m) + "m"
 
 class Acc:
-    def __init__(self, cfg, idx):
-        self.email = cfg["email"]
-        self.pw = cfg["password"]
+    def __init__(self, cfg):
+        self.email = cfg["email"]; self.pw = cfg["password"]
         self.short = self.email.split("@")[0][-8:]
-        self.ua = random.choice(USER_AGENTS)
-        self.token = None
-        self.refresh = None
-        self.uid = None
-        self.expires = 0
-        self.s = requests.Session()
+        self.ua = random.choice(USER_AGENTS); self.token = None; self.refresh = None; self.uid = None
+        self.expires = 0; self.s = requests.Session()
 
     def head(self, body=False):
-        h = {
-            "apikey": KEY,
-            "Accept": "application/json",
-            "Accept-Language": "ar-SA,ar;q=0.9,en-US;q=0.8",
-            "User-Agent": self.ua,
-            "Origin": "https://www.molok-alqarasna.com",
-            "Referer": "https://www.molok-alqarasna.com/",
-        }
-        if body:
-            h["Content-Type"] = "application/json"
-        if self.token:
-            h["Authorization"] = "Bearer " + self.token
+        h = {"apikey": KEY, "Accept": "application/json", "User-Agent": self.ua, "Origin": "https://www.molok-alqarasna.com", "Referer": "https://www.molok-alqarasna.com/"}
+        if body: h["Content-Type"] = "application/json"
+        if self.token: h["Authorization"] = "Bearer " + self.token
         return h
 
     def login(self):
         for attempt in range(4):
             try:
                 time.sleep(random.uniform(0.3, 0.9))
-                r = self.s.post(
-                    API + "/auth/v1/token?grant_type=password",
-                    headers={
-                        "apikey": KEY,
-                        "Content-Type": "application/json",
-                        "User-Agent": self.ua,
-                    },
-                    json={"email": self.email, "password": self.pw},
-                    timeout=30,
-                )
+                r = self.s.post(API + "/auth/v1/token?grant_type=password", headers={"apikey": KEY, "Content-Type": "application/json", "User-Agent": self.ua}, json={"email": self.email, "password": self.pw}, timeout=30)
                 if r.status_code == 200:
-                    d = r.json()
-                    self.token = d["access_token"]
-                    self.refresh = d.get("refresh_token")
-                    self.uid = d["user"]["id"]
-                    self.expires = time.time() + d.get("expires_in", 3600) - 300
+                    d = r.json(); self.token = d["access_token"]; self.refresh = d.get("refresh_token"); self.uid = d["user"]["id"]; self.expires = time.time() + d.get("expires_in", 3600) - 300
                     return True
-                if r.status_code == 429:
-                    time.sleep((attempt + 1) * 20)
-                    continue
-                if attempt < 3:
-                    time.sleep(3)
-                    continue
-                log("login " + str(r.status_code), self.short)
+                if r.status_code == 429: time.sleep((attempt + 1) * 20); continue
+                if attempt < 3: time.sleep(3); continue
                 return False
-            except Exception as e:
-                log("err: " + str(e)[:50], self.short)
-                time.sleep(5)
+            except Exception: time.sleep(5)
         return False
 
     def ensure(self):
-        if self.token and time.time() < self.expires:
-            return True
+        if self.token and time.time() < self.expires: return True
         if self.refresh:
             try:
-                r = self.s.post(
-                    API + "/auth/v1/token?grant_type=refresh_token",
-                    headers={"apikey": KEY, "Content-Type": "application/json"},
-                    json={"refresh_token": self.refresh},
-                    timeout=30,
-                )
+                r = self.s.post(API + "/auth/v1/token?grant_type=refresh_token", headers={"apikey": KEY, "Content-Type": "application/json"}, json={"refresh_token": self.refresh}, timeout=30)
                 if r.status_code == 200:
-                    d = r.json()
-                    self.token = d["access_token"]
-                    self.refresh = d.get("refresh_token", self.refresh)
-                    self.expires = time.time() + d.get("expires_in", 3600) - 300
+                    d = r.json(); self.token = d["access_token"]; self.refresh = d.get("refresh_token", self.refresh); self.expires = time.time() + d.get("expires_in", 3600) - 300
                     return True
-            except Exception:
-                pass
+            except Exception: pass
         return self.login()
 
     def rpc(self, name, body=None):
         self.ensure()
         try:
-            r = self.s.post(
-                API + "/rest/v1/rpc/" + name,
-                headers=self.head(True),
-                json=body or {},
-                timeout=30,
-            )
+            r = self.s.post(API + "/rest/v1/rpc/" + name, headers=self.head(True), json=body or {}, timeout=30)
             return r.status_code, r.text
-        except Exception as e:
-            return 0, str(e)
+        except Exception as e: return 0, str(e)
 
     def get(self, path):
         self.ensure()
         try:
             r = self.s.get(API + "/rest/v1/" + path, headers=self.head(), timeout=30)
             return r.status_code, r.text
-        except Exception as e:
-            return 0, str(e)
+        except Exception as e: return 0, str(e)
 
     def claim_daily(self):
-        st, tx = self.rpc("claim_daily_login_pirate", {})
-        if st == 200:
-            log("daily login reward", self.short)
-            bump("daily")
-            return True
-        return False
+        st, _ = self.rpc("claim_daily_login_pirate", {})
+        if st == 200: bump("daily"); return True
 
     def do_quests(self):
         st, tx = self.get("daily_quests?select=*&active=eq.true")
-        if st != 200:
-            return
-        try:
-            meta = {q["id"]: q for q in json.loads(tx)}
-        except Exception:
-            return
+        if st != 200: return
+        try: meta = {q["id"]: q for q in json.loads(tx)}
+        except Exception: return
         tk = riyadh_date()
-        st, tx = self.get(
-            "quest_progress?select=*&user_id=eq." + self.uid + "&day_key=eq." + tk
-        )
-        if st != 200:
-            return
-        try:
-            prog = json.loads(tx)
-        except Exception:
-            return
+        st, tx = self.get("quest_progress?select=*&user_id=eq." + self.uid + "&day_key=eq." + tk)
+        if st != 200: return
+        try: prog = json.loads(tx)
+        except Exception: return
         for p in prog:
-            if p.get("claimed"):
-                continue
-            qid = p.get("quest_id")
-            q = meta.get(qid, {})
-            if (p.get("progress") or 0) < (q.get("goal_count") or 0):
-                continue
+            if p.get("claimed"): continue
+            qid = p.get("quest_id"); q = meta.get(qid, {})
+            if (p.get("progress") or 0) < (q.get("goal_count") or 0): continue
             st, tx = self.rpc("claim_daily_quest", {"_quest_id": qid})
             if st == 200:
-                title = str(q.get("title", "?"))[:18]
-                try:
-                    j = json.loads(tx)
-                    g = j.get("gems", 0)
-                    c = j.get("coins", 0)
-                    log("quest " + title + " +" + str(g) + "g +" + str(c) + "c", self.short)
-                    acc_bump(self.email, "gems", g)
-                    acc_bump(self.email, "coins", c)
-                except Exception:
-                    log("quest " + title, self.short)
+                try: acc_bump(self.email, "gems", json.loads(tx).get("gems", 0)); acc_bump(self.email, "coins", json.loads(tx).get("coins", 0))
+                except Exception: pass
                 bump("quest_ok")
             time.sleep(random.uniform(0.5, 1.0))
 
     def claim_free_rockets(self):
-        st, tx = self.rpc("claim_daily_dragon_rockets", {})
-        if st == 200:
-            log("free rockets", self.short)
-            bump("free")
+        st, _ = self.rpc("claim_daily_dragon_rockets", {})
+        if st == 200: bump("free")
 
-    def buy_rockets(self, total=None):
-        if total is None:
-            total = BUY_ROCKET_COUNT
-        bought = 0
-        for _ in range(10):
-            st, tx = self.rpc("buy_with_coins", {
-                "_item_id": "rocket_large",
-                "_item_type": "weapon",
-                "_coins_cost": 90000,
-                "_meta": None,
-                "_count": 10,
-            })
-            if st in (200, 204):
-                bought += 10
-                log("buy +10 (" + str(bought) + ")", self.short)
+    def buy_rockets(self, total=BUY_ROCKET_COUNT):
+        bought = 0; remaining = total
+        while remaining > 0:
+            chunk = min(10, remaining)
+            st, tx = self.rpc("buy_with_coins", {"_item_id": "rocket_large", "_item_type": "weapon", "_coins_cost": 90000, "_meta": None, "_count": chunk})
+            if st in (200, 204): bought += chunk; remaining -= chunk
             elif "rocket_daily_limit" in tx:
-                try:
-                    rem = int(tx.split("rocket_daily_limit:")[1].split(":")[0])
-                except Exception:
-                    rem = 0
-                if rem > 0:
-                    st2, _ = self.rpc("buy_with_coins", {
-                        "_item_id": "rocket_large",
-                        "_item_type": "weapon",
-                        "_coins_cost": 90000,
-                        "_meta": None,
-                        "_count": rem,
-                    })
-                    if st2 in (200, 204):
-                        bought += rem
+                try: rem = int(tx.split("rocket_daily_limit:")[1].split(":")[0])
+                except Exception: rem = 0
+                if 0 < rem <= remaining:
+                    st2, _ = self.rpc("buy_with_coins", {"_item_id": "rocket_large", "_item_type": "weapon", "_coins_cost": 90000, "_meta": None, "_count": rem})
+                    if st2 in (200, 204): bought += rem
                 break
-            else:
-                break
+            else: break
             time.sleep(1.8)
-        if bought:
-            log("bought " + str(bought) + " rockets", self.short)
-            bump("bought", bought)
+        if bought: bump("bought", bought)
 
     def top_ship(self):
-        st, tx = self.get(
-            "ships_owned?select=id,catalog_code,hp,max_hp&user_id=eq." + self.uid +
-            "&destroyed_at=is.null&order=hp.desc&limit=1"
-        )
-        if st != 200:
-            return None
-        try:
-            arr = json.loads(tx)
-            return arr[0] if arr else None
-        except Exception:
-            return None
+        st, tx = self.get("ships_owned?select=id,catalog_code,hp,max_hp&user_id=eq." + self.uid + "&destroyed_at=is.null&order=hp.desc&limit=1")
+        if st != 200: return None
+        try: return json.loads(tx)[0] if json.loads(tx) else None
+        except Exception: return None
 
-    def attack_boss(self, times=None):
-        if times is None:
-            times = BOSS_ATTACKS
-        st, tx = self.rpc("get_active_boss", {})
-        if st != 200:
-            return
+    def attack_boss(self, times=BOSS_ATTACKS):
+        st, _ = self.rpc("get_active_boss", {})
+        if st != 200: return
         st, tx = self.rpc("boss_attack_status", {})
         remaining = times
         if st == 200:
-            try:
-                j = json.loads(tx)
-                remaining = min(times, j.get("remaining", times))
-            except Exception:
-                pass
-        if remaining <= 0:
-            return
+            try: remaining = min(times, json.loads(tx).get("remaining", times))
+            except Exception: pass
+        if remaining <= 0: return
         ship = self.top_ship()
-        if not ship:
-            return
-        hp = ship.get("hp") or 0
-        mx = ship.get("max_hp") or 1
-        if hp / mx < MIN_HP_PCT:
-            return
-        ship_id = ship["id"]
-        hits = 0
-        dmg_total = 0
-        for i in range(remaining):
+        if not ship or (ship.get("hp") or 0) / (ship.get("max_hp") or 1) < MIN_HP_PCT: return
+        ship_id = ship["id"]; hits = 0; dmg_total = 0
+        for _ in range(remaining):
             st, tx = self.get("ships_owned?select=hp,max_hp&id=eq." + ship_id)
+            if st != 200: break
             try:
                 cur = json.loads(tx)[0]
-                chp = cur.get("hp") or 0
-                cmx = cur.get("max_hp") or 1
-                if chp / cmx < MIN_HP_PCT:
-                    break
-            except Exception:
-                pass
+                if (cur.get("hp") or 0) / (cur.get("max_hp") or 1) < MIN_HP_PCT: break
+            except Exception: pass
             st, tx = self.rpc("attack_boss_with", {"p_weapon": "rocket_large"})
             if st == 200:
                 hits += 1
-                try:
-                    j = json.loads(tx)
-                    dmg_total += j.get("damage", 0)
-                except Exception:
-                    pass
-            else:
-                break
+                try: dmg_total += json.loads(tx).get("damage", 0)
+                except Exception: pass
+            else: break
             time.sleep(random.uniform(1.5, 2.5))
-        if hits:
-            log("boss " + str(hits) + " hits dmg=" + str(dmg_total), self.short)
-            bump("attacked", hits)
-            bump("damage", dmg_total)
-            acc_bump(self.email, "damage", dmg_total)
+        if hits: bump("attacked", hits); bump("damage", dmg_total); acc_bump(self.email, "damage", dmg_total)
 
     def donate_tribe(self):
         st, tx = self.get("profiles?id=eq." + self.uid + "&select=tribe_id,coins")
-        if st != 200:
-            return
-        try:
-            p = json.loads(tx)[0]
-            tid = p.get("tribe_id")
-            coins = p.get("coins") or 0
-        except Exception:
-            return
-        if not tid:
-            log("no tribe", self.short)
-            return
-        if coins < DONATE_AMOUNT:
-            log("low coins: " + "{:,}".format(coins), self.short)
-            return
-        st, tx = self.rpc("donate_to_tribe", {"_tribe_id": tid, "_amount": DONATE_AMOUNT})
-        if st in (200, 204):
-            log("donate " + str(DONATE_AMOUNT) + " -> " + tid[:8], self.short)
-            bump("donated")
-            acc_bump(self.email, "donated", DONATE_AMOUNT)
+        if st != 200: return
+        try: p = json.loads(tx)[0]; tid = p.get("tribe_id"); coins = p.get("coins") or 0
+        except Exception: return
+        if not tid or coins < DONATE_AMOUNT: return
+        st, _ = self.rpc("donate_to_tribe", {"_tribe_id": tid, "_amount": DONATE_AMOUNT})
+        if st in (200, 204): bump("donated"); acc_bump(self.email, "donated", DONATE_AMOUNT)
+
+    def upgrade_market(self):
+        if not MARKET_ENABLED: return
+        st, tx = self.rpc(MARKET_RPC, {})
+        if st in (200, 204): log("✅ market upgrade started!", self.short); bump("market_upg")
 
     def fish_cycle(self):
-        st, tx = self.get(
-            "ships_owned?select=id,catalog_code,at_sea,hp,max_hp,preferred_fish_id"
-            "&user_id=eq." + self.uid + "&in_storage=eq.false"
-        )
-        if st != 200:
-            return 0, 0, 0
-        try:
-            ships = json.loads(tx)
-        except Exception:
-            return 0, 0, 0
-        at_sea = [s for s in ships if s.get("at_sea")]
-        collected = 0
-        total_fish = 0
+        st, tx = self.get("ships_owned?select=id,catalog_code,at_sea,hp,max_hp,preferred_fish_id&user_id=eq." + self.uid + "&in_storage=eq.false&destroyed_at=is.null")
+        if st != 200: return 0, 0, 0
+        try: ships = json.loads(tx)
+        except Exception: return 0, 0, 0
+        at_sea = [s for s in ships if s.get("at_sea")]; collected = 0; total_fish = 0
         for s in at_sea:
             fish = s.get("preferred_fish_id") or "poseidon"
-            st, tx = self.rpc("collect_fishing_reward", {
-                "_ship_id": s["id"],
-                "_requested_fish_id": fish,
-                "_client_progress": 5000,
-            })
+            st, tx = self.rpc("collect_fishing_reward", {"_ship_id": s["id"], "_requested_fish_id": fish, "_client_progress": 5000})
             if st == 200:
                 collected += 1
                 try:
                     arr = json.loads(tx)
-                    if arr:
-                        qty = arr[0].get("fish_qty", 0)
-                        total_fish += qty
-                        fid = arr[0].get("fish_id", "?")
-                        log("collect " + str(s.get("catalog_code")) + " " + str(qty) + "x" + fid, self.short)
-                except Exception:
-                    pass
+                    if arr: total_fish += arr[0].get("fish_qty", 0)
+                except Exception: pass
             self.rpc("set_ship_at_sea", {"_ship_id": s["id"], "_at_sea": False})
             time.sleep(random.uniform(0.3, 0.7))
-
+        
         st, tx = self.rpc("get_fish_stock_summary", {})
         sold = 0
         if st == 200:
-            try:
-                stock = json.loads(tx)
-            except Exception:
-                stock = []
+            try: stock = json.loads(tx)
+            except Exception: stock = []
             for item in stock:
-                fid = item.get("fish_id")
-                qty = item.get("qty", 0)
-                if not fid or qty <= 0:
-                    continue
-                st2, _ = self.rpc("sell_fish_by_qty", {
-                    "_fish_id": fid,
-                    "_qty": qty,
-                    "_client_version": CV,
-                })
-                if st2 in (200, 204):
-                    sold += qty
-                    log("sell " + str(qty) + "x" + fid, self.short)
+                fid = item.get("fish_id"); qty = item.get("qty", 0)
+                if not fid or qty <= 0: continue
+                st2, _ = self.rpc("sell_fish_by_qty", {"_fish_id": fid, "_qty": qty, "_client_version": CV})
+                if st2 in (200, 204): sold += qty
                 time.sleep(random.uniform(0.3, 0.7))
-
-        st, tx = self.get(
-            "ships_owned?select=id,catalog_code,at_sea,hp,max_hp"
-            "&user_id=eq." + self.uid + "&in_storage=eq.false"
-        )
+                
+        st, tx = self.get("ships_owned?select=id,at_sea,hp,max_hp&user_id=eq." + self.uid + "&in_storage=eq.false&destroyed_at=is.null")
         sent = 0
         if st == 200:
-            try:
-                ships2 = json.loads(tx)
-            except Exception:
-                ships2 = []
+            try: ships2 = json.loads(tx)
+            except Exception: ships2 = []
             for s in ships2:
-                if s.get("at_sea"):
-                    continue
-                hp = s.get("hp") or 0
-                mx = s.get("max_hp") or 1
-                if hp / mx < MIN_HP_PCT:
-                    continue
+                if s.get("at_sea") or (s.get("hp") or 0) / (s.get("max_hp") or 1) < MIN_HP_PCT: continue
                 st2, _ = self.rpc("set_ship_at_sea", {"_ship_id": s["id"], "_at_sea": True})
-                if st2 in (200, 204):
-                    sent += 1
+                if st2 in (200, 204): sent += 1
                 time.sleep(random.uniform(0.3, 0.7))
-        bump("collected", collected)
-        bump("sold", sold)
-        if total_fish:
-            acc_bump(self.email, "fish", total_fish)
+        bump("collected", collected); bump("sold", sold)
+        if total_fish: acc_bump(self.email, "fish", total_fish)
         return collected, sold, sent
-
 
 def fish_worker(cfg, idx):
     time.sleep(idx * 0.3)
-    acc = Acc(cfg, idx)
-    if not acc.login():
-        bump("login_fail")
-        return
+    acc = Acc(cfg)
+    if not acc.login(): bump("login_fail"); return
+    bump("login")
     c, s, sent = acc.fish_cycle()
     bump("fish_cycles")
-    log("cycle collect=" + str(c) + " sold=" + str(s) + " sent=" + str(sent), acc.short)
-
 
 def worker_boss_rockets(cfg, idx):
     time.sleep(idx * 0.5)
-    acc = Acc(cfg, idx)
-    if not acc.login():
-        bump("login_fail")
-        return
+    acc = Acc(cfg)
+    if not acc.login(): bump("login_fail"); return
     bump("login")
-    acc.claim_free_rockets()
-    time.sleep(0.5)
-    acc.buy_rockets(30)
-    time.sleep(0.5)
-    acc.attack_boss(5)
-
+    acc.claim_free_rockets(); time.sleep(0.5)
+    acc.buy_rockets(); time.sleep(0.5)
+    acc.attack_boss()
 
 def worker_daily_quests(cfg, idx):
     time.sleep(idx * 0.5)
-    acc = Acc(cfg, idx)
-    if not acc.login():
-        bump("login_fail")
-        return
+    acc = Acc(cfg)
+    if not acc.login(): bump("login_fail"); return
     bump("login")
-    acc.claim_daily()
-    time.sleep(0.5)
+    acc.claim_daily(); time.sleep(0.5)
     acc.do_quests()
 
+def worker_market_upgrade(cfg, idx):
+    time.sleep(idx * 0.5)
+    acc = Acc(cfg)
+    if not acc.login(): bump("login_fail"); return
+    bump("login")
+    acc.upgrade_market()
 
 def worker_donate(cfg, idx):
     time.sleep(idx * 0.5)
-    acc = Acc(cfg, idx)
-    if not acc.login():
-        bump("login_fail")
-        return
+    acc = Acc(cfg)
+    if not acc.login(): bump("login_fail"); return
     bump("login")
     acc.donate_tribe()
 
-
 def run_parallel(worker, name, stagger=0.5):
-    log("=" * 40)
-    log(name)
-    log("=" * 40)
+    log("=" * 40); log(name); log("=" * 40)
     threads = []
     for i, cfg in enumerate(ACCOUNTS):
-        t = threading.Thread(target=worker, args=(cfg, i))
-        t.start()
-        threads.append(t)
-        time.sleep(stagger)
-    for t in threads:
-        t.join()
-
+        def wrap(c=cfg, i=i, w=worker):
+            try: w(c, i)
+            except Exception as e: log("worker err: " + str(e)[:100], "WORKER"); bump("errors")
+        t = threading.Thread(target=wrap); t.start(); threads.append(t); time.sleep(stagger)
+    for t in threads: t.join()
 
 def run_phase(worker, name):
-    log(name + " start")
-    start = time.time()
-    run_parallel(worker, name)
-    elapsed = time.time() - start
-    log(name + " complete in " + str(int(elapsed)) + "s")
-
-
-def run_fish_cycle():
-    run_parallel(fish_worker, "FISH CYCLE", stagger=0.3)
-    with LOCK:
-        STATS["last_fish"] = time.time()
-
+    log(name + " start"); start = time.time()
+    try: run_parallel(worker, name)
+    except Exception as e: log("phase err: " + str(e)[:150]); bump("errors")
+    log(name + " complete in " + str(int(time.time() - start)) + "s")
 
 def run_main_cycle():
-    total_start = time.time()
+    global LAST_MAIN_RUN_DATE
+    if not MAIN_RUN_LOCK.acquire(blocking=False): return
+    LAST_MAIN_RUN_DATE = riyadh_date()
     try:
-        log("=" * 50)
-        log("MAIN CYCLE START (fish continues)")
-        log("=" * 50)
+        log("=" * 50); log("MAIN CYCLE START"); log("=" * 50)
         run_phase(worker_boss_rockets, "PHASE 1: rockets + boss")
         run_phase(worker_daily_quests, "PHASE 2: daily + quests")
-        run_phase(worker_donate, "PHASE 3: donate tribe")
-        with LOCK:
-            STATS["last_run"] = time.time()
+        run_phase(worker_market_upgrade, "PHASE 3: market upgrade")
+        run_phase(worker_donate, "PHASE 4: donate tribe")
+        with LOCK: STATS["last_run"] = time.time(); STATS["last_main"] = time.time()
         bump("main_cycles")
-    except Exception as e:
-        log("main err: " + str(e)[:150])
-        bump("errors")
-    total = int(time.time() - total_start)
-    log("=" * 50)
-    log("MAIN CYCLE DONE in " + str(total // 60) + "m " + str(total % 60) + "s")
-    log("=" * 50)
-
+    except Exception as e: log("main err: " + str(e)[:150]); bump("errors")
+    finally: MAIN_RUN_LOCK.release()
+    log("=" * 50); log("MAIN CYCLE DONE"); log("=" * 50)
 
 def fish_loop_thread():
+    if not FISH_ENABLED: return
     time.sleep(15)
     while True:
-        if FISH_ENABLED:
-            try:
-                run_fish_cycle()
-            except Exception as e:
-                log("fish err: " + str(e)[:150])
-                bump("errors")
-        
-        # 11 دقيقة أساسية + تنوع عشوائي من 0 إلى 30 ثانية (الإجمالي بين 660 و 690 ثانية)
-        current_fish_interval = random.randint(660, 690)
-        log("next fish in " + str(current_fish_interval) + "s")
-        time.sleep(current_fish_interval)
-
+        try: run_parallel(fish_worker, "FISH CYCLE", stagger=0.3)
+        except Exception: bump("errors")
+        with LOCK: STATS["last_fish"] = time.time()
+        n = random.randint(660, 690); time.sleep(n)
 
 def scheduler_thread():
     sync_time_offset()
-    log("main scheduler target " + str(MAIN_HOUR) + ":" + str(MAIN_MINUTE).zfill(2) + " Riyadh", "INIT")
     last_resync = time.time()
-    last_run_date = None
-
     while True:
         try:
-            if time.time() - last_resync > 3600:
-                sync_time_offset()
-                last_resync = time.time()
-
-            now_r = now_riyadh()
-            today = now_r.strftime("%Y-%m-%d")
-
-            if last_run_date == today:
-                wait_sec = seconds_until_riyadh(MAIN_HOUR, MAIN_MINUTE)
-            else:
-                target = now_r.replace(hour=MAIN_HOUR, minute=MAIN_MINUTE, second=0, microsecond=0)
-                if target <= now_r:
-                    wait_sec = (target + timedelta(days=1) - now_r).total_seconds()
-                else:
-                    wait_sec = (target - now_r).total_seconds()
-
-            log("next main in " + fmt_dur(wait_sec) + " (now " + now_r.strftime("%H:%M:%S") + " Riyadh)", "SCHED")
-
+            if time.time() - last_resync > 3600: sync_time_offset(); last_resync = time.time()
+            now_r = now_riyadh(); today = now_r.strftime("%Y-%m-%d")
+            target = now_r.replace(hour=MAIN_HOUR, minute=MAIN_MINUTE, second=0, microsecond=0)
+            if LAST_MAIN_RUN_DATE == today or target <= now_r:
+                target = (target + timedelta(days=1))
+            wait_sec = (target - now_r).total_seconds()
             end = time.time() + wait_sec
             while time.time() < end:
-                chunk = min(300, end - time.time())
-                if chunk <= 0:
-                    break
-                time.sleep(chunk)
-                if time.time() - last_resync > 3600:
-                    sync_time_offset()
-                    last_resync = time.time()
-                    rem = seconds_until_riyadh(MAIN_HOUR, MAIN_MINUTE)
-                    end = time.time() + rem
-
-            now_r = now_riyadh()
-            today = now_r.strftime("%Y-%m-%d")
-
-            if last_run_date == today:
-                log("main already ran today", "SCHED")
-                time.sleep(60)
-                continue
-
-            if MAIN_ENABLED:
-                log("TRIGGERING MAIN at " + now_r.strftime("%H:%M:%S") + " Riyadh", "SCHED")
-                run_main_cycle()
-                last_run_date = today
-                time.sleep(120)
-            else:
-                last_run_date = today
-                time.sleep(60)
-
-        except Exception as e:
-            log("scheduler err: " + str(e)[:150])
-            bump("errors")
-            time.sleep(60)
-
+                time.sleep(min(300, end - time.time()))
+                if time.time() - last_resync > 3600: sync_time_offset(); last_resync = time.time()
+            if MAIN_ENABLED: run_main_cycle(); time.sleep(120)
+        except Exception: time.sleep(60)
 
 app = Flask(__name__)
 
-
 @app.route("/")
 def index():
-    uptime = int(time.time() - STATS["started_at"])
-    h = uptime // 3600
-    m = (uptime % 3600) // 60
-
-    def ago(t):
-        return int(time.time() - t) if t else "-"
-
-    now_r = now_riyadh().strftime("%Y-%m-%d %H:%M:%S")
-    next_main = fmt_dur(seconds_until_riyadh(MAIN_HOUR, MAIN_MINUTE))
-
-    html = """
-    <!DOCTYPE html><html lang="ar" dir="rtl"><head>
-    <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-    <title>CIPHER v7</title><style>
-    *{box-sizing:border-box;margin:0;padding:0}
-    body{font-family:-apple-system,sans-serif;background:#0a0e1a;color:#e0e0e0;padding:20px}
-    h1{color:#fbbf24;margin-bottom:20px;font-size:24px}
-    .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:24px}
-    .card{background:#111827;border:1px solid #1f2937;border-radius:10px;padding:16px}
-    .card .label{font-size:12px;color:#9ca3af;margin-bottom:6px}
-    .card .value{font-size:22px;font-weight:bold;color:#fbbf24}
-    .log{background:#000;border-radius:8px;padding:14px;font-family:monospace;font-size:11px;max-height:500px;overflow-y:auto}
-    .log div{padding:2px 0;border-bottom:1px solid #111}
-    .green{color:#4ade80}.red{color:#f87171}.yellow{color:#fbbf24}.blue{color:#60a5fa}
-    </style></head><body>
-    <h1>CIPHER UNIFIED v7</h1>
-    <p style="color:#9ca3af;margin-bottom:20px;">
-      Accounts: {{ acc_count }} | Uptime: {{ h }}h {{ m }}m<br>
-      Fish: 11:00-11:30 randomized (24/7)<br>
-      <b class="blue">Main: {{ main_time }} Riyadh daily</b><br>
-      <b class="blue">Next main in: {{ next_main }}</b><br>
-      Now Riyadh: <b>{{ now_riyadh }}</b><br>
-      Time Source: <b class="yellow">{{ time_source }}</b> | Offset: {{ time_offset }}s
-    </p>
+    with LOCK:
+        snap = dict(STATS); acc_stats_snap = {k: dict(v) for k, v in STATS["account_stats"].items()}
+    with LOG_LOCK: logs_snap = list(LOG_LINES[-150:])
+    return render_template_string("""
+    <!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>CIPHER v7.2</title>
+    <style>body{font-family:sans-serif;background:#0a0e1a;color:#e0e0e0;padding:20px}h1{color:#fbbf24}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}.card{background:#111827;padding:15px;border-radius:8px}.val{font-size:20px;color:#fbbf24;font-weight:bold}.log{background:#000;padding:10px;font-family:monospace;font-size:11px;max-height:400px;overflow-y:auto;margin-top:20px}</style>
+    </head><body><h1>CIPHER v7.2 (Server Mode)</h1>
+    <p>Accounts: {{ acc_count }} | Uptime: {{ h }}h {{ m }}m<br>Now Riyadh: {{ now_r }}<br>Next Main: {{ next_main }}</p>
     <div class="grid">
-      <div class="card"><div class="label">Fish Cycles</div><div class="value">{{ fish_cycles }}</div></div>
-      <div class="card"><div class="label">Collected</div><div class="value">{{ collected }}</div></div>
-      <div class="card"><div class="label">Fish Sold</div><div class="value">{{ sold }}</div></div>
-      <div class="card"><div class="label">Main Cycles</div><div class="value">{{ main_cycles }}</div></div>
-      <div class="card"><div class="label">Daily</div><div class="value">{{ daily }}</div></div>
-      <div class="card"><div class="label">Quests</div><div class="value">{{ quest_ok }}</div></div>
-      <div class="card"><div class="label">Free Rockets</div><div class="value">{{ free }}</div></div>
-      <div class="card"><div class="label">Bought</div><div class="value">{{ bought }}</div></div>
-      <div class="card"><div class="label">Attacks</div><div class="value">{{ attacked }}</div></div>
-      <div class="card"><div class="label">Damage</div><div class="value">{{ damage }}</div></div>
-      <div class="card"><div class="label">Donated</div><div class="value">{{ donated }}</div></div>
-      <div class="card"><div class="label">Login OK</div><div class="value green">{{ login }}</div></div>
-      <div class="card"><div class="label">Login Fail</div><div class="value red">{{ login_fail }}</div></div>
-      <div class="card"><div class="label">Errors</div><div class="value red">{{ errors }}</div></div>
-    </div>
-    <p style="color:#9ca3af;margin-bottom:10px;">
-      Last run: {{ last_run }}s | Last main: {{ last_main }}s | Last fish: {{ last_fish }}s
-    </p>
-    <h2 style="color:#fbbf24;margin:20px 0 10px;font-size:18px;">Live Log</h2>
-    <div class="log">{% for line in logs %}<div>{{ line }}</div>{% endfor %}</div>
-    </body></html>
-    """
-    return render_template_string(
-        html,
-        acc_count=len(ACCOUNTS),
-        h=h,
-        m=m,
-        fish_int="11:00-11:30s",
-        main_time=str(MAIN_HOUR) + ":" + str(MAIN_MINUTE).zfill(2),
-        next_main=next_main,
-        now_riyadh=now_r,
-        time_source=STATS.get("time_source", "local"),
-        time_offset=STATS.get("time_offset_sec", 0),
-        fish_cycles=STATS["fish_cycles"],
-        main_cycles=STATS["main_cycles"],
-        collected=STATS["collected"],
-        sold="{:,}".format(STATS["sold"]),
-        daily=STATS["daily"],
-        quest_ok=STATS["quest_ok"],
-        free=STATS["free"],
-        bought=STATS["bought"],
-        attacked=STATS["attacked"],
-        damage="{:,}".format(STATS["damage"]),
-        donated=STATS["donated"],
-        login=STATS["login"],
-        login_fail=STATS["login_fail"],
-        errors=STATS["errors"],
-        last_run=ago(STATS["last_run"]),
-        last_main=ago(STATS["last_main"]),
-        last_fish=ago(STATS["last_fish"]),
-        logs=LOG_LINES[-150:],
-    )
-
+    <div class="card">Fish Cycles<br><span class="val">{{ f_c }}</span></div>
+    <div class="card">Main Cycles<br><span class="val">{{ m_c }}</span></div>
+    <div class="card">Attacks<br><span class="val">{{ atk }}</span></div>
+    <div class="card">Damage<br><span class="val">{{ dmg }}</span></div>
+    <div class="card">Market Upg<br><span class="val">{{ m_upg }}</span></div>
+    <div class="card">Login OK/Fail<br><span class="val">{{ l_ok }}/{{ l_fail }}</span></div>
+    </div><div class="log">{% for l in logs %}<div>{{ l }}</div>{% endfor %}</div></body></html>
+    """, acc_count=len(ACCOUNTS), h=int((time.time()-snap["started_at"])//3600), m=int(((time.time()-snap["started_at"])%3600)//60),
+    now_r=now_riyadh().strftime("%H:%M:%S"), next_main=fmt_dur(seconds_until_riyadh(MAIN_HOUR, MAIN_MINUTE)),
+    f_c=snap["fish_cycles"], m_c=snap["main_cycles"], atk=snap["attacked"], dmg=snap["damage"], m_upg=snap["market_upg"],
+    l_ok=snap["login"], l_fail=snap["login_fail"], logs=logs_snap)
 
 @app.route("/health")
-@app.route("/healthz")
-def health():
-    return jsonify({"ok": True, "uptime": int(time.time() - STATS["started_at"])})
-
-
-@app.route("/api/status")
-def api_status():
-    return jsonify({
-        "accounts": len(ACCOUNTS),
-        "fish_interval_mode": "randomized 660-690s (11:00-11:30)",
-        "main_hour": MAIN_HOUR,
-        "main_minute": MAIN_MINUTE,
-        "now_riyadh": now_riyadh().strftime("%Y-%m-%d %H:%M:%S"),
-        "next_main_in_sec": int(seconds_until_riyadh(MAIN_HOUR, MAIN_MINUTE)),
-        "time_source": STATS.get("time_source", "local"),
-        "time_offset_sec": STATS.get("time_offset_sec", 0),
-        "stats": {k: v for k, v in STATS.items() if k != "account_stats"},
-        "account_stats": STATS["account_stats"],
-    })
-
-
-@app.route("/trigger", methods=["POST", "GET"])
-def trigger():
-    threading.Thread(target=run_main_cycle, daemon=True).start()
-    return jsonify({"ok": True, "msg": "main triggered"})
-
-
-@app.route("/sync_time", methods=["POST", "GET"])
-def sync_time_endpoint():
-    ok = sync_time_offset()
-    return jsonify({
-        "ok": ok,
-        "time_source": STATS.get("time_source"),
-        "time_offset_sec": STATS.get("time_offset_sec"),
-        "now_riyadh": now_riyadh().strftime("%Y-%m-%d %H:%M:%S"),
-    })
-
+def health(): return jsonify({"ok": True})
+@app.route("/trigger")
+def trigger(): threading.Thread(target=run_main_cycle, daemon=True).start(); return "Triggered"
 
 def start_all():
-    if not ACCOUNTS:
-        log("no accounts configured", "INIT")
-        return
-    log("start " + str(len(ACCOUNTS)) + " accounts", "INIT")
-    log("fish: randomized 660-690s (11:00-11:30) (24/7)", "INIT")
-    log("main: " + str(MAIN_HOUR) + ":" + str(MAIN_MINUTE).zfill(2) + " Riyadh daily", "INIT")
+    if not ACCOUNTS: log("No accounts env vars found!", "INIT"); return
+    log("Start " + str(len(ACCOUNTS)) + " accounts", "INIT")
     threading.Thread(target=fish_loop_thread, daemon=True).start()
     threading.Thread(target=scheduler_thread, daemon=True).start()
-
 
 start_all()
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 10000))
-    app.run(host="0.0.0.0", port=port, debug=False)
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 10000)))
