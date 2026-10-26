@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+<title>👑 مملكة القراصنة</title>
+<link rel="stylesheet" href="css/main.css">
+</head>
+<body>
+<div id="app">
+  <div id="scene">
+    <div class="map-item harbor" data-key="harbor"><div class="map-box"><span class="map-icon">⚓</span></div><div class="map-label">الميناء</div></div>
+    <div class="map-item market" data-key="shipMarket"><div class="map-box"><span class="map-icon">🛥</span></div><div class="map-label">سوق السفن</div></div>
+    <div class="map-item market" data-key="fishMarket"><div class="map-box"><span class="map-icon">🐟</span></div><div class="map-label">سوق السمك</div></div>
+    <div class="map-item sea" data-key="sea"><div class="map-box"><span class="map-icon">🌊</span></div><div class="map-label">البحر</div></div>
+    <div id="boat"></div>
+    <div id="target"></div>
+  </div>
+
+  <header id="topbar">
+    <div class="player" id="playerBox" title="تغيير الاسم">
+      <div class="avatar">👤</div>
+      <div class="pinfo">
+        <div id="pname">القبطان</div>
+        <div class="lvlbar"><div id="lvlFill"></div></div>
+        <div id="lvlTxt">مستوى 1</div>
+      </div>
+    </div>
+    <div class="resources">
+      <div class="res">💰<b id="coins">0</b></div>
+      <div class="res">💎<b id="gems">0</b></div>
+      <div class="res">🐟<b id="fishCount">0</b></div>
+    </div>
+    <button class="gift-btn" id="giftBtn" title="المكافأة اليومية">🎁</button>
+  </header>
+
+  <div id="eventBanner"></div>
+  <div id="message"></div>
+  <div id="progress"><div id="progressFill"></div><div id="progressText">0%</div></div>
+  <div id="log"></div>
+
+  <nav id="bottombar">
+    <button class="nav-btn" data-screen="home"><span class="icon">🏠</span>المنزل</button>
+    <button class="nav-btn" data-screen="storage"><span class="icon">🎒</span>المخزن</button>
+    <button class="nav-btn" data-screen="shop"><span class="icon">🛒</span>المتجر</button>
+    <button class="nav-btn" data-screen="daily"><span class="icon">🎁</span>يومي</button>
+    <button class="nav-btn" data-screen="achv"><span class="icon">🏆</span>إنجازات</button>
+    <button class="nav-btn" data-screen="stats"><span class="icon">📊</span>إحصاء</button>
+  </nav>
+
+  <section class="screen" id="screen-storage">
+    <div class="sh"><span class="st">🎒 المخزن</span><button class="close-btn" data-close>✕</button></div>
+    <div class="sb">
+      <div class="hero">
+        <div class="muted">القيمة التقريبية للمخزن</div>
+        <div class="big"><span id="invValue">0</span> 💰</div>
+        <div style="display:flex;gap:8px;margin-top:12px;align-items:center">
+          <select class="sort" id="sortSel">
+            <option value="price">ترتيب: السعر</option>
+            <option value="qty">الكمية</option>
+            <option value="rarity">الندرة</option>
+          </select>
+          <button class="btn gold" id="sellAllBtn" style="flex:1;padding:10px">بيع الكل</button>
+        </div>
+      </div>
+      <div id="invList"></div>
+    </div>
+  </section>
+
+  <section class="screen" id="screen-shop">
+    <div class="sh"><span class="st">🛒 المتجر</span><button class="close-btn" data-close>✕</button></div>
+    <div class="tabs">
+      <button class="tab active" data-tab="ships">⛵ سفن</button>
+      <button class="tab" data-tab="backgrounds">🏞 خلفيات</button>
+    </div>
+    <div class="sb" id="shopList"></div>
+  </section>
+
+  <section class="screen" id="screen-daily">
+    <div class="sh"><span class="st">🎁 المكافأة اليومية</span><button class="close-btn" data-close>✕</button></div>
+    <div class="sb">
+      <div class="hero" id="dailyHero"></div>
+      <div class="muted" id="dailyInfo" style="margin-bottom:12px"></div>
+      <button class="btn gold wide" id="claimBtn">استلم المكافأة</button>
+      <div class="muted" style="margin-top:14px;line-height:1.8">
+        كل يوم تزيد المكافأة، وكل 7 أيام تحصل على 10 💎. إذا فاتك يوم تبدأ السلسلة من جديد.
+      </div>
+    </div>
+  </section>
+
+  <section class="screen" id="screen-achv">
+    <div class="sh"><span class="st">🏆 الإنجازات</span><button class="close-btn" data-close>✕</button></div>
+    <div class="sb" id="achvList"></div>
+  </section>
+
+  <section class="screen" id="screen-stats">
+    <div class="sh"><span class="st">📊 إحصاءات الصياد</span><button class="close-btn" data-close>✕</button></div>
+    <div class="sb">
+      <div class="stat-grid" id="statsGrid"></div>
+      <button class="btn alt wide" id="soundBtn" style="margin-top:14px">🔊 الصوت</button>
+    </div>
+  </section>
+
+  <button id="editToggle" title="وضع التعديل">🛠</button>
+  <button id="editReset" title="إرجاع الأماكن الأصلية">↺</button>
+</div>
+
+<!-- ═══ البيانات: الأسماك والسفن والمستويات ═══ -->
+<script src="game_data.js"></script>
+<!-- ═══ محمّل الأصول (إن وُجد) ═══ -->
+<script src="assets-loader.js"></script>
+<script src="js/game.js"></script>
+<script src="js/registry.js"></script>
+</body>
+</html>

@@ -1,0 +1,106 @@
+/* ═══════════════════════════════════════════════════════════════════
+   nav.css — الشريط السفلي الجديد + العمود الجانبي (v7.0.0)
+   يضاف بعد main.css — يستبدل #bottombar و #lbColumn
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* ═══ الشريط السفلي — 7 أزرار ═══ */
+#bottombar {
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  padding: 6px 4px calc(var(--safe-bottom) + 6px);
+  display: flex;
+  justify-content: space-between-end;
+  gap: 0;
+  overflow: visible;
+  background: linear-gradient(180deg, transparent, rgba(5, 12, 24, 0.98) 55%);
+  z-index: 20;
+}
+
+.nav-btn {
+  flex: 1 1 0;
+  min-width: 0;
+  padding: 2px 0 4px;
+  border: 0;
+  background: transparent;
+  color: #ead087;
+  font-family: inherit;
+  font-size: 10px;
+  font-weight: 900;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  cursor: pointer;
+  position: relative;
+  transition: transform 0.12s ease;
+  -webkit-tap-highlight-color: transparent;
+  box-shadow: none;
+}
+.nav-btn::before { display: none; }
+.nav-btn:active { transform: scale(0.92); }
+
+.nav-btn .nav-ico {
+  width: 46px;
+  height: 46px;
+  object-fit: contain;
+  display: block;
+  pointer-events: none;
+  filter: drop-shadow(0 5px 8px rgba(0,0,0,0.7)) drop-shadow(0 0 6px rgba(241,190,82,0.15));
+  transition: filter 0.2s;
+}
+.nav-btn.active .nav-ico {
+  filter: drop-shadow(0 5px 8px rgba(0,0,0,0.7)) drop-shadow(0 0 14px rgba(255,215,106,0.85));
+}
+
+.nav-btn .nav-lbl {
+  font-size: 10px;
+  font-weight: 900;
+  line-height: 1;
+  color: #ead087;
+  text-shadow: 0 1px 3px rgba(0,0,0,0.95);
+  white-space: nowrap;
+  letter-spacing: 0.2px;
+  margin-top: 1px;
+}
+
+.nav-btn .nav-badge {
+  position: absolute;
+  top: 0;
+  right: calc(50% - 28px);
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #e53935, #8f1212);
+  border: 1.5px solid rgba(255,243,200,0.95);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 900;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.5);
+  pointer-events: none;
+  line-height: 1;
+}
+
+@media (max-width: 360px) {
+  .nav-btn .nav-ico { width: 42px; height: 42px; }
+  .nav-btn .nav-lbl { font-size: 9px; }
+}
+
+/* ═══ العمود الجانبي — 3 أزرار ═══ */
+#lbColumn {
+  position: absolute;
+  left: 10px;
+  top: calc(var(--safe-top) + 130px);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  z-index: 22;
+  pointer-events: auto;
+}
+
+.nav-btn .nav-ico { width: 38px !important; height: 38px !important; object-fit: contain !important; }
+#bg-video { z-index: 1 !important; pointer-events: none; }
+#scene { background: transparent !important; }

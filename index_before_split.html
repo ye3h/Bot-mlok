@@ -1,0 +1,1504 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+<title>👑 مملكة القراصنة</title>
+<style>
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+:root{--gold:#FFD76A;--gold2:#FFB300;--glass:rgba(12,22,40,.76);--line:rgba(255,215,106,.35);--safe-top:env(safe-area-inset-top,0px);--safe-bottom:env(safe-area-inset-bottom,0px)}
+html,body{margin:0;height:100%;overflow:hidden;font-family:-apple-system,'Segoe UI',Tahoma,sans-serif;background:#07162b;color:#fff;user-select:none}
+#app{position:relative;width:100%;height:100vh;height:100dvh;overflow:hidden}
+
+/* ═══ المشهد ═══ */
+#scene{position:absolute;inset:0;background:url('assets/backgrounds/bg_storm.jpg') center/cover no-repeat,linear-gradient(180deg,#87CEEB,#4A90D9 40%,#1a4d8f 75%,#0a2540)}
+#scene::after{content:'';position:absolute;inset:0;background:radial-gradient(ellipse at center,rgba(0,0,0,0) 40%,rgba(0,0,0,.55) 100%);pointer-events:none}
+#boat{position:absolute;font-size:72px;z-index:2;filter:drop-shadow(0 8px 12px rgba(0,0,0,.6));will-change:transform;cursor:pointer}
+#boat img{width:84px;height:84px;object-fit:contain;display:block;pointer-events:none}
+#boat.sailing{animation:bob 2s ease-in-out infinite}
+@keyframes bob{0%,100%{transform:translate(-50%,-50%) translateY(0) rotate(-3deg)}50%{transform:translate(-50%,-50%) translateY(-8px) rotate(3deg)}}
+#target{position:absolute;width:22px;height:22px;border-radius:50%;border:2px solid var(--gold);background:rgba(255,215,106,.35);transform:translate(-50%,-50%);display:none;pointer-events:none;z-index:1}
+
+/* ═══ الأماكن على الخريطة (شفافة) ═══ */
+.map-item{position:absolute;transform:translate(-50%,-50%);z-index:1;display:flex;flex-direction:column;align-items:center;cursor:pointer;touch-action:none;width:110px}
+.map-box{width:110px;height:70px;display:flex;align-items:center;justify-content:center;background:transparent!important;border:2px dashed transparent;border-radius:14px;box-shadow:none}
+.map-item.sea .map-box{width:130px;height:80px}
+.map-icon{font-size:26px;line-height:1}
+.map-label{font-size:12px;font-weight:800;color:var(--gold);text-shadow:0 2px 4px rgba(0,0,0,.8);white-space:nowrap;margin-top:2px}
+body:not(.edit-on) .map-icon,body:not(.edit-on) .map-label{display:none}
+body.edit-on .map-box{border:2px dashed rgba(255,215,106,.9)}
+
+/* ═══ الشريط العلوي ═══ */
+#topbar{position:absolute;top:0;left:0;right:0;padding:calc(var(--safe-top) + 8px) 10px 6px;display:flex;align-items:center;gap:6px;z-index:20;background:linear-gradient(180deg,rgba(0,0,0,.6),transparent)}
+.player{display:flex;align-items:center;gap:8px;padding:5px 10px 5px 5px;border-radius:16px;background:var(--glass);border:1px solid var(--line);min-width:0;cursor:pointer}
+.avatar{width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,#1e3a5f,#0b1d33);border:2px solid var(--gold);display:flex;align-items:center;justify-content:center;font-size:17px;flex-shrink:0}
+.pinfo{min-width:0;width:96px}
+#pname{font-size:12px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lvlbar{height:6px;border-radius:4px;background:rgba(255,255,255,.12);overflow:hidden;margin:3px 0 1px}
+#lvlFill{height:100%;width:0;background:linear-gradient(90deg,var(--gold2),var(--gold));transition:width .4s}
+#lvlTxt{font-size:10px;color:var(--gold)}
+.resources{flex:1;display:flex;gap:4px;justify-content:flex-end;min-width:0;overflow:hidden}
+.res{padding:5px 7px;border-radius:12px;background:var(--glass);border:1px solid var(--line);font-size:11px;font-weight:700;white-space:nowrap}
+.res b{color:var(--gold);margin-inline-start:3px}
+.gift-btn{position:relative;width:38px;height:38px;border-radius:50%;border:2px solid var(--gold);background:linear-gradient(180deg,#FF6B9D,#C2185B);font-size:17px;padding:0;flex-shrink:0;box-shadow:0 4px 12px rgba(0,0,0,.4)}
+.gift-btn.ping::after{content:'';position:absolute;inset:-5px;border-radius:50%;border:2px solid var(--gold);animation:ping 1.4s infinite}
+@keyframes ping{0%{transform:scale(.8);opacity:1}100%{transform:scale(1.5);opacity:0}}
+
+#eventBanner{position:absolute;top:calc(var(--safe-top) + 62px);left:50%;transform:translateX(-50%);padding:6px 14px;border-radius:20px;font-size:12px;font-weight:700;background:rgba(0,0,0,.65);border:1px solid var(--line);z-index:19;display:none;white-space:nowrap}
+#eventBanner.show{display:block}
+
+#message{position:absolute;top:calc(var(--safe-top) + 108px);left:50%;transform:translate(-50%,-6px);padding:9px 18px;border-radius:20px;background:rgba(10,18,34,.94);border:1px solid var(--line);font-size:13px;font-weight:700;opacity:0;transition:.25s;pointer-events:none;white-space:nowrap;z-index:30}
+#message.visible{opacity:1;transform:translate(-50%,0)}
+
+.fly{position:absolute;font-weight:800;color:var(--gold);text-shadow:0 2px 6px #000;pointer-events:none;z-index:40;animation:floatUp 1.1s ease-out forwards;font-size:15px}
+.pop{font-size:26px}
+@keyframes floatUp{0%{opacity:0;transform:translate(-50%,0) scale(.8)}20%{opacity:1}100%{opacity:0;transform:translate(-50%,-60px) scale(1.1)}}
+
+#progress{position:absolute;left:15%;right:15%;bottom:calc(var(--safe-bottom) + 110px);height:20px;background:rgba(0,0,0,.5);border:1px solid var(--line);border-radius:10px;overflow:hidden;display:none;z-index:15}
+#progress.visible{display:block}
+#progressFill{height:100%;width:0;background:linear-gradient(90deg,#43A047,#8BC34A);transition:width .3s}
+#progressText{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;text-shadow:0 1px 3px #000}
+
+#log{position:absolute;left:14px;right:14px;bottom:calc(var(--safe-bottom) + 170px);max-height:110px;overflow-y:auto;background:var(--glass);border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:6px 10px;font-size:12px;display:none;z-index:14}
+#log.visible{display:block}
+#log .line{padding:3px 0;border-bottom:1px solid rgba(255,255,255,.08)}
+
+/* ═══ شريط التنقل ═══ */
+#bottombar{position:absolute;left:0;right:0;bottom:0;padding:8px 6px calc(var(--safe-bottom) + 8px);display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:5px;background:linear-gradient(180deg,transparent,rgba(5,12,24,.96) 45%);z-index:20}
+.nav-btn{border:1px solid rgba(255,255,255,.12);border-radius:14px;background:var(--glass);color:#fff;padding:6px 2px;font-family:inherit;font-size:10px;font-weight:700;display:flex;flex-direction:column;align-items:center;gap:2px;min-width:0}
+.nav-btn .icon{font-size:20px}
+.nav-btn.active{border-color:var(--gold);box-shadow:0 0 12px rgba(255,215,106,.4)}
+.nav-btn:active{transform:scale(.94)}
+
+/* ═══ زر الوضع (ثابت فوق شريط التنقل) ═══ */
+#editToggle,#editReset{position:absolute;right:10px;z-index:60;width:46px;height:46px;border-radius:50%;border:2px solid var(--gold);background:rgba(10,25,45,.95);color:#fff;font-size:20px;padding:0;box-shadow:0 4px 12px rgba(0,0,0,.6)}
+#editToggle{bottom:calc(var(--safe-bottom) + 98px)}
+#editToggle.on{background:#2E7D32;border-color:#4CAF50}
+#editReset{bottom:calc(var(--safe-bottom) + 152px);display:none}
+body.edit-on #editReset{display:block}
+
+/* ═══ الشاشات ═══ */
+.screen{position:absolute;inset:0;z-index:25;display:flex;flex-direction:column;padding:calc(var(--safe-top) + 12px) 14px calc(var(--safe-bottom) + 96px);background:linear-gradient(180deg,rgba(9,20,38,.98),rgba(5,12,24,.98));transform:translateY(102%);transition:transform .38s cubic-bezier(.2,.8,.2,1);pointer-events:none}
+.screen.open{transform:none;pointer-events:auto}
+.sh{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.st{font-size:20px;font-weight:800;color:var(--gold)}
+.close-btn{width:36px;height:36px;border-radius:50%;border:none;background:rgba(255,255,255,.12);color:#fff;font-size:18px}
+.sb{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch}
+.tabs{display:flex;gap:8px;margin-bottom:12px}
+.tab{flex:1;padding:10px;border-radius:12px;border:1px solid rgba(255,255,255,.15);background:var(--glass);color:#fff;font-family:inherit;font-weight:700;font-size:14px}
+.tab.active{border-color:var(--gold);box-shadow:0 0 12px rgba(255,215,106,.35)}
+.hero{border-radius:18px;padding:16px;background:linear-gradient(135deg,rgba(255,215,106,.18),rgba(20,40,70,.6));border:1px solid var(--line);margin-bottom:12px}
+.hero .big{font-size:26px;font-weight:800;color:var(--gold)}
+.muted{color:rgba(255,255,255,.6);font-size:12px}
+.card{display:flex;gap:12px;align-items:center;background:var(--glass);border:1px solid rgba(255,255,255,.1);border-radius:16px;padding:12px;margin-bottom:10px;position:relative;overflow:hidden}
+.card::before{content:'';position:absolute;right:0;top:0;bottom:0;width:4px;background:var(--rc,#777)}
+.card.locked{opacity:.55}
+.thumb{width:56px;height:46px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:30px}
+.thumb img{width:100%;height:100%;object-fit:cover;border-radius:10px}
+.info{flex:1;min-width:0}
+.nm{font-weight:800;font-size:15px}
+.sub{font-size:11px;color:rgba(255,255,255,.6);margin-top:2px}
+.pr{color:var(--gold);font-weight:800;margin-top:4px;font-size:14px}
+.acts{display:flex;flex-direction:column;gap:6px}
+.btn{padding:8px 12px;border:none;border-radius:10px;color:#fff;font-family:inherit;font-weight:700;font-size:12px;background:linear-gradient(180deg,#43A047,#2E7D32);min-width:84px}
+.btn.alt{background:linear-gradient(180deg,#1E88E5,#1565C0)}
+.btn.gold{background:linear-gradient(180deg,var(--gold),var(--gold2));color:#2a1d00}
+.btn:disabled{background:#3a3f4a;color:#9aa0aa}
+.btn:active:not(:disabled){transform:scale(.96)}
+.btn.wide{width:100%;padding:14px;font-size:15px}
+.tag{font-size:10px;background:linear-gradient(90deg,#FFD76A,#FF9800);color:#2a1d00;border-radius:6px;padding:1px 6px;font-weight:800;margin-inline-start:4px}
+.stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.stat{background:var(--glass);border:1px solid rgba(255,255,255,.1);border-radius:14px;padding:12px;text-align:center}
+.stat .v{font-size:20px;font-weight:800;color:var(--gold)}
+.stat .k{font-size:11px;color:rgba(255,255,255,.6);margin-top:2px}
+select.sort{background:var(--glass);color:#fff;border:1px solid var(--line);border-radius:10px;padding:8px;font-family:inherit}
+.ach-done{border-color:rgba(255,215,106,.5)}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="scene">
+    <div class="map-item harbor" data-key="harbor"><div class="map-box"><span class="map-icon">⚓</span></div><div class="map-label">الميناء</div></div>
+    <div class="map-item market" data-key="shipMarket"><div class="map-box"><span class="map-icon">🛥</span></div><div class="map-label">سوق السفن</div></div>
+    <div class="map-item market" data-key="fishMarket"><div class="map-box"><span class="map-icon">🐟</span></div><div class="map-label">سوق السمك</div></div>
+    <div class="map-item sea" data-key="sea"><div class="map-box"><span class="map-icon">🌊</span></div><div class="map-label">البحر</div></div>
+    <div id="boat"></div>
+    <div id="target"></div>
+  </div>
+
+  <header id="topbar">
+    <div class="player" id="playerBox" title="تغيير الاسم">
+      <div class="avatar">👤</div>
+      <div class="pinfo">
+        <div id="pname">القبطان</div>
+        <div class="lvlbar"><div id="lvlFill"></div></div>
+        <div id="lvlTxt">مستوى 1</div>
+      </div>
+    </div>
+    <div class="resources">
+      <div class="res">💰<b id="coins">0</b></div>
+      <div class="res">💎<b id="gems">0</b></div>
+      <div class="res">🐟<b id="fishCount">0</b></div>
+    </div>
+    <button class="gift-btn" id="giftBtn" title="المكافأة اليومية">🎁</button>
+  </header>
+
+  <div id="eventBanner"></div>
+  <div id="message"></div>
+  <div id="progress"><div id="progressFill"></div><div id="progressText">0%</div></div>
+  <div id="log"></div>
+
+  <nav id="bottombar">
+    <button class="nav-btn" data-screen="home"><span class="icon">🏠</span>المنزل</button>
+    <button class="nav-btn" data-screen="storage"><span class="icon">🎒</span>المخزن</button>
+    <button class="nav-btn" data-screen="shop"><span class="icon">🛒</span>المتجر</button>
+    <button class="nav-btn" data-screen="daily"><span class="icon">🎁</span>يومي</button>
+    <button class="nav-btn" data-screen="achv"><span class="icon">🏆</span>إنجازات</button>
+    <button class="nav-btn" data-screen="stats"><span class="icon">📊</span>إحصاء</button>
+  </nav>
+
+  <section class="screen" id="screen-storage">
+    <div class="sh"><span class="st">🎒 المخزن</span><button class="close-btn" data-close>✕</button></div>
+    <div class="sb">
+      <div class="hero">
+        <div class="muted">القيمة التقريبية للمخزن</div>
+        <div class="big"><span id="invValue">0</span> 💰</div>
+        <div style="display:flex;gap:8px;margin-top:12px;align-items:center">
+          <select class="sort" id="sortSel">
+            <option value="price">ترتيب: السعر</option>
+            <option value="qty">الكمية</option>
+            <option value="rarity">الندرة</option>
+          </select>
+          <button class="btn gold" id="sellAllBtn" style="flex:1;padding:10px">بيع الكل</button>
+        </div>
+      </div>
+      <div id="invList"></div>
+    </div>
+  </section>
+
+  <section class="screen" id="screen-shop">
+    <div class="sh"><span class="st">🛒 المتجر</span><button class="close-btn" data-close>✕</button></div>
+    <div class="tabs">
+      <button class="tab active" data-tab="ships">⛵ سفن</button>
+      <button class="tab" data-tab="backgrounds">🏞 خلفيات</button>
+    </div>
+    <div class="sb" id="shopList"></div>
+  </section>
+
+  <section class="screen" id="screen-daily">
+    <div class="sh"><span class="st">🎁 المكافأة اليومية</span><button class="close-btn" data-close>✕</button></div>
+    <div class="sb">
+      <div class="hero" id="dailyHero"></div>
+      <div class="muted" id="dailyInfo" style="margin-bottom:12px"></div>
+      <button class="btn gold wide" id="claimBtn">استلم المكافأة</button>
+      <div class="muted" style="margin-top:14px;line-height:1.8">
+        كل يوم تزيد المكافأة، وكل 7 أيام تحصل على 10 💎. إذا فاتك يوم تبدأ السلسلة من جديد.
+      </div>
+    </div>
+  </section>
+
+  <section class="screen" id="screen-achv">
+    <div class="sh"><span class="st">🏆 الإنجازات</span><button class="close-btn" data-close>✕</button></div>
+    <div class="sb" id="achvList"></div>
+  </section>
+
+  <section class="screen" id="screen-stats">
+    <div class="sh"><span class="st">📊 إحصاءات الصياد</span><button class="close-btn" data-close>✕</button></div>
+    <div class="sb">
+      <div class="stat-grid" id="statsGrid"></div>
+      <button class="btn alt wide" id="soundBtn" style="margin-top:14px">🔊 الصوت</button>
+    </div>
+  </section>
+
+  <button id="editToggle" title="وضع التعديل">🛠</button>
+  <button id="editReset" title="إرجاع الأماكن الأصلية">↺</button>
+</div>
+
+<!-- ═══ البيانات: الأسماك والسفن والمستويات ═══ -->
+<script src="game_data.js"></script>
+<!-- ═══ محمّل الأصول (إن وُجد) ═══ -->
+<script src="assets-loader.js"></script>
+
+<script>
+'use strict';
+
+/* ════════════ إعدادات ════════════ */
+const SAVE_KEY = 'fishing_save_v1';
+const LAYOUT_KEY = 'fishing_layout_v1';
+const SOUND_KEY = 'fishing_sound_v1';
+const TRIP_DURATION = 20000;
+const TICK_MS = 50;
+const MAX_LEVEL = 150;
+const GOLD_CHANCE = 0.03;
+const GOLD_MULT = 3;
+const EVENT_EVERY = 60000;
+const EVENT_LIFE = 90000;
+const EVENT_CHANCE = 0.6;
+const DEFAULT_BG = 'bg_storm';
+const DEV_MODE = false;
+
+const TS = { IDLE: 'idle', FISHING: 'fishing', RETURNING: 'returning' };
+const MARKET = { MIN_MULT: 0.5, MAX_MULT: 1.8, SELL_DROP: 0.02, RECOVER: 0.03, TICK_MS: 60000 };
+const RARITY_COLORS = { common: '#9e9e9e', uncommon: '#4CAF50', rare: '#2196F3', epic: '#9C27B0', legendary: '#FFD700' };
+const RARITY_NAMES = { common: 'شائع', uncommon: 'غير شائع', rare: 'نادر', epic: 'ملحمي', legendary: 'أسطوري' };
+const GRADIENT_BG = 'linear-gradient(180deg,#87CEEB 0%,#4A90D9 40%,#1a4d8f 75%,#0a2540 100%)';
+
+/* ════════════ الخلفيات (5 صور موجودة فعلاً) ════════════ */
+const BACKGROUNDS = [
+  {id:'bg_storm',   cat:'backgrounds', icon:'⛈', name:'العاصفة',   img:'assets/backgrounds/bg_storm.jpg',   price_coins:0,     rarity:'common'},
+  {id:'bg_day',     cat:'backgrounds', icon:'☀️', name:'النهار',    img:'assets/backgrounds/bg_day.jpg',     price_coins:5000,  rarity:'common'},
+  {id:'bg_sunset',  cat:'backgrounds', icon:'🌅', name:'الغروب',    img:'assets/backgrounds/bg_sunset.jpg',  price_coins:10000, rarity:'uncommon'},
+  {id:'bg_night',   cat:'backgrounds', icon:'🌙', name:'الليل',     img:'assets/backgrounds/bg_night.jpg',   price_coins:20000, rarity:'rare'},
+  {id:'bg_crystal', cat:'backgrounds', icon:'💎', name:'الكريستال', img:'assets/backgrounds/bg_crystal.png', price_coins:50000, rarity:'epic'},
+];
+
+const SHIP_BY_ID = Object.fromEntries(SHIPS.map(s => [s.id, s]));
+const ITEM_BY_ID = Object.fromEntries([...SHIPS, ...BACKGROUNDS].map(i => [i.id, i]));
+const LEGACY_SHIP = { boat_small: 'ship_1', basic: 'ship_1' };
+const LEGACY_BG = { bg_titan: 'bg_storm' };
+
+/* ════════════ الإنجازات ════════════ */
+const ACHIEVEMENTS = [
+  {id:'first_catch', name:'أول صيد',       desc:'اصطد سمكة واحدة',          gems:5,   test:s => s.stats.caught >= 1},
+  {id:'catch_100',   name:'صياد ماهر',     desc:'اصطد 100 سمكة',           gems:20,  test:s => s.stats.caught >= 100},
+  {id:'catch_1000',  name:'سيد المحيط',    desc:'اصطد 1000 سمكة',          gems:100, test:s => s.stats.caught >= 1000},
+  {id:'first_sale',  name:'تاجر',          desc:'بع أول سمكة',             gems:5,   test:s => s.stats.sold >= 1},
+  {id:'rich',        name:'ثري',           desc:'اجمع 50,000 ذهب من البيع', gems:30,  test:s => s.stats.earned >= 50000},
+  {id:'golden',      name:'الحظ الذهبي',   desc:'اصطد سمكة ذهبية',         gems:25,  test:s => s.stats.golden >= 1},
+  {id:'legend',      name:'صياد الأساطير', desc:'اصطد سمكة أسطورية',       gems:40,  test:s => s.stats.legendary >= 1},
+  {id:'fleet',       name:'أسطول صغير',    desc:'امتلك 3 سفن',             gems:20,  test:s => s.owned.filter(id => SHIP_BY_ID[id]).length >= 3},
+  {id:'lvl10',       name:'قبطان',         desc:'وصل للمستوى 10',          gems:15,  test:s => levelOf(s.xp) >= 10},
+  {id:'lvl70',       name:'أسطورة البحار', desc:'وصل للمستوى 150',         gems:300, test:s => levelOf(s.xp) >= MAX_LEVEL},
+];
+
+/* ════════════ الحالة والحفظ ════════════ */
+function freshState() {
+  return {
+    name: 'القبطان', coins: 0, gems: 0, xp: 0, trip: null,
+    owned: ['ship_1', DEFAULT_BG],
+    equipped: { ships: 'ship_1', backgrounds: DEFAULT_BG },
+    market: {}, inventory: {},
+    stats: { caught: 0, golden: 0, legendary: 0, sold: 0, earned: 0, trips: 0 },
+    achv: {}, daily: { last: null, streak: 0 },
+  };
+}
+
+function loadState() {
+  let s = {};
+  try { s = JSON.parse(localStorage.getItem(SAVE_KEY) || '{}') || {}; } catch (e) {}
+  const st = Object.assign(freshState(), s);
+  st.stats = Object.assign(freshState().stats, s.stats || {});
+  if (!s.stats && s.totalFish) st.stats.caught = s.totalFish;
+  st.daily = Object.assign({ last: null, streak: 0 }, s.daily || {});
+  st.achv = s.achv || {};
+
+  st.equipped = Object.assign({ ships: 'ship_1', backgrounds: DEFAULT_BG }, s.equipped || {});
+  if (LEGACY_SHIP[st.equipped.ships]) st.equipped.ships = LEGACY_SHIP[st.equipped.ships];
+  if (LEGACY_BG[st.equipped.backgrounds]) st.equipped.backgrounds = LEGACY_BG[st.equipped.backgrounds];
+  if (!SHIP_BY_ID[st.equipped.ships]) st.equipped.ships = 'ship_1';
+  const bg = ITEM_BY_ID[st.equipped.backgrounds];
+  if (!bg || bg.cat !== 'backgrounds') st.equipped.backgrounds = DEFAULT_BG;
+
+  st.owned = (Array.isArray(s.owned) ? s.owned : [])
+    .map(id => LEGACY_SHIP[id] || LEGACY_BG[id] || id)
+    .filter((id, i, arr) => ITEM_BY_ID[id] && arr.indexOf(id) === i);
+  ['ship_1', DEFAULT_BG, st.equipped.ships, st.equipped.backgrounds].forEach(id => {
+    if (!st.owned.includes(id)) st.owned.push(id);
+  });
+
+  st.inventory = s.inventory || {};
+  st.market = s.market || {};
+  if (st.trip && !Array.isArray(st.trip.catches)) st.trip.catches = [];
+  if (typeof st.xp !== 'number') st.xp = 0;
+  return st;
+}
+
+function saveState() {
+  try {
+    if (window.ModuleRegistry) ModuleRegistry.saveAll(state);
+    localStorage.setItem(SAVE_KEY, JSON.stringify(state));
+  } catch (e) {}
+}
+
+const DEFAULT_LAYOUT = {
+  harbor:     { x: 0.16, y: 0.42 },
+  fishMarket: { x: 0.22, y: 0.22 },
+  shipMarket: { x: 0.82, y: 0.22 },
+  sea:        { x: 0.60, y: 0.42 },
+};
+
+function loadLayout() {
+  const base = JSON.parse(JSON.stringify(DEFAULT_LAYOUT));
+  try {
+    const saved = JSON.parse(localStorage.getItem(LAYOUT_KEY) || 'null');
+    if (saved) Object.keys(base).forEach(k => {
+      const p = saved[k];
+      if (p && typeof p.x === 'number' && typeof p.y === 'number' && p.x >= 0 && p.x <= 1 && p.y >= 0 && p.y <= 1) base[k] = p;
+    });
+  } catch (e) {}
+  return base;
+}
+
+function saveLayout() {
+  try { localStorage.setItem(LAYOUT_KEY, JSON.stringify(layout)); } catch (e) {}
+}
+
+/* ════════════ متغيرات التشغيل ════════════ */
+let state = loadState();
+let layout = loadLayout();
+let currentTripState = TS.IDLE;
+let shopTab = 'ships';
+let sortMode = 'price';
+let previewTimer = null, previewBackId = null;
+let activeScreen = null;
+let _msgTimer = null;
+let lastTick = Date.now();
+let lastRender = 0;
+let editMode = false;
+let dragKey = null;
+let activeEvent = null;
+let soundOn = localStorage.getItem(SOUND_KEY) !== 'off';
+let audioCtx = null;
+
+const $ = id => document.getElementById(id);
+const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+function setText(id, v) { const el = $(id); if (el) el.textContent = v; }
+function fishImg(id) { return 'assets/fish/' + id + '.webp'; }
+function hook() {
+  if (window.ModuleRegistry) ModuleRegistry.callHook.apply(null, arguments);
+}
+
+/* ════════════ الصوت والتأثيرات ════════════ */
+function beep(freq, dur) {
+  if (!soundOn) return;
+  try {
+    audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+    const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+    o.type = 'sine';
+    o.frequency.value = freq;
+    g.gain.setValueAtTime(0.05, audioCtx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + dur);
+    o.connect(g); g.connect(audioCtx.destination);
+    o.start(); o.stop(audioCtx.currentTime + dur);
+  } catch (e) {}
+}
+
+function fly(text, anchor, cls) {
+  const app = $('app');
+  const el = document.createElement('div');
+  el.className = 'fly' + (cls ? ' ' + cls : '');
+  el.textContent = text;
+  if (anchor) {
+    const r = anchor.getBoundingClientRect(), ar = app.getBoundingClientRect();
+    el.style.left = (r.left - ar.left + r.width / 2) + 'px';
+    el.style.top = (r.top - ar.top) + 'px';
+  } else {
+    el.style.left = '50%';
+    el.style.top = '180px';
+  }
+  app.appendChild(el);
+  setTimeout(() => el.remove(), 1100);
+}
+
+function catchPop(emoji) {
+  const scene = $('scene');
+  const el = document.createElement('div');
+  el.className = 'fly pop';
+  el.textContent = emoji;
+  el.style.left = (P.x * scene.clientWidth) + 'px';
+  el.style.top = (P.y * scene.clientHeight - 50) + 'px';
+  scene.appendChild(el);
+  setTimeout(() => el.remove(), 1100);
+}
+
+/* ════════════ السوق والأسعار ════════════ */
+function ensureMarket() {
+  Object.keys(FISH).forEach(id => {
+    const m = state.market[id];
+    if (!m || typeof m.mult !== 'number') state.market[id] = { mult: 1, soldSinceTick: 0 };
+  });
+}
+
+function baseOf(k) { return k.startsWith('g_') ? k.slice(2) : k; }
+function isGolden(k) { return k.startsWith('g_'); }
+
+function eventMult(id) {
+  return activeEvent && Date.now() < activeEvent.until && activeEvent.fish === id ? activeEvent.mult : 1;
+}
+
+function unitPrice(k) {
+  const id = baseOf(k);
+  let p = FISH[id].base * state.market[id].mult * eventMult(id);
+  if (isGolden(k)) p *= GOLD_MULT;
+  return Math.round(p);
+}
+
+function sellRaw(k, n) {
+  const id = baseOf(k), m = state.market[id];
+  let got = 0;
+  for (let i = 0; i < n; i++) {
+    got += unitPrice(k);
+    if (!isGolden(k)) {
+      m.mult = Math.max(MARKET.MIN_MULT, m.mult * (1 - MARKET.SELL_DROP));
+      m.soldSinceTick++;
+    }
+  }
+  state.inventory[k] -= n;
+  if (state.inventory[k] <= 0) delete state.inventory[k];
+  state.coins += got;
+  state.stats.sold += n;
+  state.stats.earned += got;
+  hook('onSale', k, n, got);
+  return got;
+}
+
+function finishSale(n, got) {
+  saveState();
+  render();
+  renderStorage();
+  fly('+' + got.toLocaleString() + ' 💰', $('coins'));
+  beep(660, 0.08);
+  showMessage('💰 بعت ' + n + ' بـ ' + got.toLocaleString());
+  checkAchievements();
+}
+
+function sellItem(k, qty) {
+  const n = Math.min(qty, state.inventory[k] || 0);
+  if (n <= 0) return;
+  finishSale(n, sellRaw(k, n));
+}
+
+function sellAll() {
+  const keys = invEntries();
+  if (!keys.length) return;
+  let got = 0, n = 0;
+  keys.forEach(k => { const q = state.inventory[k]; got += sellRaw(k, q); n += q; });
+  finishSale(n, got);
+}
+
+setInterval(function () {
+  ensureMarket();
+  Object.keys(FISH).forEach(id => {
+    const m = state.market[id];
+    if (m.soldSinceTick === 0) m.mult = Math.min(MARKET.MAX_MULT, m.mult * (1 + MARKET.RECOVER));
+    m.soldSinceTick = 0;
+  });
+  saveState();
+  if (activeScreen === 'storage') renderStorage();
+}, MARKET.TICK_MS);
+
+/* ════════════ الأحداث العشوائية ════════════ */
+function rollEvent() {
+  if (activeEvent && Date.now() < activeEvent.until) return;
+  activeEvent = null;
+  if (Math.random() < EVENT_CHANCE) {
+    const ids = Object.keys(FISH);
+    const id = ids[Math.floor(Math.random() * ids.length)];
+    const boom = Math.random() < 0.6;
+    activeEvent = { fish: id, mult: boom ? 1.8 : 0.5, boom, until: Date.now() + EVENT_LIFE };
+    showMessage((boom ? '🔥 موسم ' : '📉 كساد ') + FISH[id].name);
+    log((boom ? '🔥 ارتفع سعر ' : '📉 انخفض سعر ') + FISH[id].name + ' مؤقتاً');
+  }
+  renderEvent();
+}
+
+function renderEvent() {
+  const b = $('eventBanner');
+  if (activeEvent && Date.now() < activeEvent.until) {
+    b.textContent = (activeEvent.boom ? '🔥 موسم ' : '📉 كساد ') + FISH[activeEvent.fish].name + ' × ' + activeEvent.mult;
+    b.classList.add('show');
+  } else {
+    activeEvent = null;
+    b.classList.remove('show');
+  }
+}
+
+/* ════════════ الصيد والخبرة ════════════ */
+function currentShip() { return SHIP_BY_ID[state.equipped.ships] || SHIPS[0]; }
+function shipSpeed(ship) { return 1 + (12 - ship.fishing_seconds) * 0.05; }
+function catchChancePerSecond(ship) { return 1 / ship.fishing_seconds; }
+
+function pickFishFor(ship) {
+  const f = ship.fish.slice(0, 3);
+  return f[Math.floor(Math.random() * f.length)];
+}
+
+function xpFor(id) {
+  const ship = currentShip();
+  const lvl = ship ? (ship.req_level || 1) : 1;
+  let divisor = 8;
+  if (lvl < 10) divisor = 3;
+  else if (lvl < 25) divisor = 5;
+  return Math.max(1, Math.round(FISH[id].base / divisor));
+}
+
+/* ════════════ المستويات ════════════ */
+function levelOf(xp) {
+  let lv = 1;
+  while (lv < MAX_LEVEL && xp >= XP_THRESH[lv + 1]) lv++;
+  return lv;
+}
+
+function levelProgress(xp) {
+  const lv = levelOf(xp);
+  if (lv >= MAX_LEVEL) return 100;
+  const lo = XP_THRESH[lv], hi = XP_THRESH[lv + 1];
+  return Math.floor((xp - lo) / (hi - lo) * 100);
+}
+
+/* ════════════ الفيزياء والحركة ════════════ */
+const P = { x: 0.5, y: 0.5, vx: 0, vy: 0, tx: 0.5, ty: 0.5, hasTarget: false, maxSpeed: 0.35, accel: 4, damping: 2.5, rot: 0, ready: false };
+
+function applyBoatTransform() {
+  const scene = $('scene'), boat = $('boat');
+  if (!scene || !boat) return;
+  boat.style.left = (P.x * scene.clientWidth) + 'px';
+  boat.style.top = (P.y * scene.clientHeight) + 'px';
+  boat.style.transform = 'translate(-50%,-50%) rotate(' + P.rot.toFixed(2) + 'deg)';
+}
+
+function initBoatPosition() {
+  P.x = layout.harbor.x; P.y = layout.harbor.y;
+  P.tx = P.x; P.ty = P.y;
+  P.vx = 0; P.vy = 0;
+  P.hasTarget = false;
+  P.ready = true;
+  applyBoatTransform();
+}
+
+function setTarget(nx, ny) {
+  P.tx = clamp(nx, 0.05, 0.95);
+  P.ty = clamp(ny, 0.12, 0.88);
+  P.hasTarget = true;
+  const t = $('target'), scene = $('scene');
+  if (t && scene) {
+    t.style.display = 'block';
+    t.style.left = (P.tx * scene.clientWidth) + 'px';
+    t.style.top = (P.ty * scene.clientHeight) + 'px';
+  }
+}
+
+function hideTarget() { const t = $('target'); if (t) t.style.display = 'none'; }
+
+function updateBoatPhysics(dt) {
+  if (!P.ready) return;
+
+  if (currentTripState === TS.RETURNING) {
+    const dh = Math.hypot(P.x - layout.harbor.x, P.y - layout.harbor.y);
+    if (dh < 0.03 && Math.hypot(P.vx, P.vy) < 0.05) {
+      P.hasTarget = false;
+      hideTarget();
+      endTrip();
+    }
+  }
+
+  const sp = shipSpeed(currentShip());
+  if (P.hasTarget) {
+    const dx = P.tx - P.x, dy = P.ty - P.y, dist = Math.hypot(dx, dy);
+    if (dist < 0.01) {
+      P.hasTarget = false;
+      hideTarget();
+    } else {
+      const maxV = P.maxSpeed * sp * Math.min(1, dist * 6);
+      const k = Math.min(1, P.accel * dt);
+      P.vx += ((dx / dist) * maxV - P.vx) * k;
+      P.vy += ((dy / dist) * maxV - P.vy) * k;
+    }
+  }
+  if (!P.hasTarget) {
+    const d = Math.exp(-P.damping * dt);
+    P.vx *= d; P.vy *= d;
+  }
+
+  P.x += P.vx * dt;
+  P.y += P.vy * dt;
+  if (P.x < 0.05) { P.x = 0.05; P.vx = Math.abs(P.vx) * 0.5; }
+  if (P.x > 0.95) { P.x = 0.95; P.vx = -Math.abs(P.vx) * 0.5; }
+  if (P.y < 0.12) { P.y = 0.12; P.vy = Math.abs(P.vy) * 0.5; }
+  if (P.y > 0.88) { P.y = 0.88; P.vy = -Math.abs(P.vy) * 0.5; }
+
+  const rotTarget = clamp((P.vx / P.maxSpeed) * 15, -15, 15);
+  P.rot += (rotTarget - P.rot) * Math.min(1, dt * 8);
+  applyBoatTransform();
+}
+
+function applyShip() {
+  const boat = $('boat');
+  if (!boat) return;
+  const ship = currentShip();
+  boat.innerHTML = '';
+  const img = document.createElement('img');
+  img.src = ship.img;
+  img.alt = ship.name;
+  img.onerror = function () { boat.textContent = ship.icon || '⛵'; };
+  boat.appendChild(img);
+}
+
+/* ════════════ الرحلة ════════════ */
+function startTrip() {
+  if (editMode || state.trip || currentTripState !== TS.IDLE) return;
+  state.trip = { startedAt: Date.now(), endsAt: Date.now() + TRIP_DURATION, shipId: state.equipped.ships, catches: [] };
+  currentTripState = TS.FISHING;
+  setTarget(layout.sea.x, layout.sea.y);
+  saveState();
+  render();
+  showMessage('🌊 القارب في البحر — يصطاد...');
+  log('⛵ بدأت الرحلة بـ ' + currentShip().name);
+  beep(440, 0.1);
+  hook('onTripStart');
+}
+
+function startReturn() {
+  if (currentTripState !== TS.FISHING) return;
+  currentTripState = TS.RETURNING;
+  setTarget(layout.harbor.x, layout.harbor.y);
+  showMessage('🏠 يعود للميناء...');
+  log('🏠 يعود للميناء');
+  render();
+}
+
+function endTrip() {
+  currentTripState = TS.IDLE;
+  if (!state.trip) return;
+  const catches = state.trip.catches;
+  let xpGain = 0, legendaryCount = 0, goldenCount = 0;
+
+  catches.forEach(k => {
+    state.inventory[k] = (state.inventory[k] || 0) + 1;
+    const id = baseOf(k);
+    state.stats.caught++;
+    if (isGolden(k)) { state.stats.golden++; goldenCount++; }
+    if (FISH[id].rarity === 'legendary') { state.stats.legendary++; legendaryCount++; }
+    xpGain += xpFor(id) * (isGolden(k) ? GOLD_MULT : 1);
+  });
+  state.stats.trips++;
+
+  const before = levelOf(state.xp);
+  state.xp += xpGain;
+  const after = levelOf(state.xp);
+  state.trip = null;
+  saveState();
+  render();
+  renderStorage();
+
+  if (after > before) {
+    const bonus = after * 100;
+    state.coins += bonus;
+    saveState();
+    showMessage('🎉 وصلت للمستوى ' + after + '! +' + bonus + ' 💰');
+    log('🎉 مستوى جديد: ' + after);
+    fly('+' + bonus + ' 💰', $('coins'));
+    hook('onLevelUp', after);
+  } else if (catches.length) {
+    showMessage('🎣 ' + catches.length + ' سمكة في المخزن');
+  } else {
+    showMessage('😔 لم تصطد شيئاً هذه المرة');
+  }
+
+  if (catches.length) {
+    log('🏠 رجعت بـ ' + summarizeCatches(catches).join(' و'));
+  } else {
+    log('🏠 رجعت فارغ اليدين');
+  }
+  if (goldenCount) log('✨ صيد ذهبي × ' + goldenCount);
+  if (legendaryCount) log('🌟 صيد أسطوري × ' + legendaryCount);
+
+  hook('onTripEnd');
+  checkAchievements();
+}
+
+/* يجمع النسخ العادية والذهبية تحت نفس السمكة */
+function summarizeCatches(catches) {
+  const normal = {}, gold = {}, order = [];
+  catches.forEach(k => {
+    const id = baseOf(k);
+    if (!normal[id] && !gold[id]) order.push(id);
+    if (isGolden(k)) gold[id] = (gold[id] || 0) + 1;
+    else normal[id] = (normal[id] || 0) + 1;
+  });
+  return order.map(id => {
+    let s = '';
+    if (normal[id]) s += normal[id] + ' ' + FISH[id].name;
+    if (gold[id]) s += (s ? ' + ' : '') + gold[id] + ' ✨' + FISH[id].name;
+    return s;
+  });
+}
+
+/* ════════════ الرسم ════════════ */
+function render() {
+  setText('coins', state.coins.toLocaleString());
+  setText('gems', state.gems);
+  setText('fishCount', state.stats.caught);
+  setText('pname', state.name);
+
+  const lv = levelOf(state.xp);
+  setText('lvlTxt', 'مستوى ' + lv + ' / ' + MAX_LEVEL);
+  const lf = $('lvlFill');
+  if (lf) lf.style.width = levelProgress(state.xp) + '%';
+
+  const boat = $('boat'), progress = $('progress');
+  const busy = currentTripState !== TS.IDLE;
+  if (boat) boat.classList.toggle('sailing', busy);
+  if (progress) progress.classList.toggle('visible', !!state.trip);
+
+  if (state.trip) {
+    const pct = Math.min(100, ((Date.now() - state.trip.startedAt) / TRIP_DURATION) * 100);
+    const fill = $('progressFill');
+    if (fill) fill.style.width = pct + '%';
+    setText('progressText', Math.floor(pct) + '%   🐟 ' + state.trip.catches.length);
+  }
+
+  $('giftBtn').classList.toggle('ping', canClaimDaily());
+  renderEvent();
+}
+
+function showMessage(text) {
+  const el = $('message');
+  if (!el) return;
+  el.textContent = text;
+  el.classList.add('visible');
+  if (_msgTimer) clearTimeout(_msgTimer);
+  _msgTimer = setTimeout(() => el.classList.remove('visible'), 2800);
+}
+
+function log(text) {
+  const logEl = $('log');
+  if (!logEl) return;
+  logEl.classList.add('visible');
+  const line = document.createElement('div');
+  line.className = 'line';
+  const time = new Date().toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' });
+  line.textContent = time + ' — ' + text;
+  logEl.insertBefore(line, logEl.firstChild);
+  while (logEl.children.length > 20) logEl.removeChild(logEl.lastChild);
+}
+
+function makeBtn(text, cls, onClick, disabled) {
+  const b = document.createElement('button');
+  b.textContent = text;
+  b.className = cls || 'btn';
+  b.disabled = !!disabled;
+  if (onClick) b.onclick = onClick;
+  return b;
+}
+
+function itemImage(item, w, h) {
+  const img = document.createElement('img');
+  img.src = item.img;
+  img.alt = item.name;
+  img.style.width = w + 'px';
+  img.style.height = h + 'px';
+  img.onerror = function () {
+    const s = document.createElement('span');
+    s.textContent = item.icon || '🖼';
+    s.style.fontSize = '28px';
+    img.replaceWith(s);
+  };
+  return img;
+}
+
+function emptyCard(text) {
+  const d = document.createElement('div');
+  d.className = 'card';
+  d.innerHTML = '<div class="info muted">' + text + '</div>';
+  return d;
+}
+
+/* ════════════ المخزن ════════════ */
+function invEntries() {
+  return Object.keys(state.inventory).filter(k => state.inventory[k] > 0 && FISH[baseOf(k)]);
+}
+
+function renderStorage() {
+  const keys = invEntries();
+  let total = 0;
+  keys.forEach(k => { total += unitPrice(k) * state.inventory[k]; });
+  setText('invValue', total.toLocaleString());
+
+  const list = $('invList');
+  list.innerHTML = '';
+  if (!keys.length) { list.appendChild(emptyCard('المخزن فارغ — أبحر لتصطاد الأسماك.')); return; }
+
+  const rank = { legendary: 5, epic: 4, rare: 3, uncommon: 2, common: 1 };
+  keys.sort((a, b) => {
+    const A = FISH[baseOf(a)], B = FISH[baseOf(b)];
+    if (sortMode === 'qty') return state.inventory[b] - state.inventory[a];
+    if (sortMode === 'rarity') return rank[B.rarity] - rank[A.rarity];
+    return unitPrice(b) * state.inventory[b] - unitPrice(a) * state.inventory[a];
+  });
+
+  keys.forEach(k => {
+    const id = baseOf(k), f = FISH[id], qty = state.inventory[k];
+    const card = document.createElement('div');
+    card.className = 'card';
+    card.style.setProperty('--rc', isGolden(k) ? '#FFD76A' : RARITY_COLORS[f.rarity]);
+
+    const th = document.createElement('div');
+    th.className = 'thumb';
+    th.appendChild(itemImage({ img: fishImg(id), name: f.name, icon: f.emoji }, 56, 46));
+    card.appendChild(th);
+
+    const info = document.createElement('div');
+    info.className = 'info';
+    info.innerHTML =
+      '<div class="nm">' + f.name + ' × ' + qty + (isGolden(k) ? '<span class="tag">ذهبية ✨</span>' : '') + '</div>' +
+      '<div class="sub" style="color:' + RARITY_COLORS[f.rarity] + '">● ' + RARITY_NAMES[f.rarity] + '</div>' +
+      '<div class="pr">💰 ' + unitPrice(k).toLocaleString() + ' للقطعة</div>';
+    card.appendChild(info);
+
+    const acts = document.createElement('div');
+    acts.className = 'acts';
+    acts.appendChild(makeBtn('بيع 1', 'btn', () => sellItem(k, 1)));
+    acts.appendChild(makeBtn('بيع الكل', 'btn alt', () => sellItem(k, qty)));
+    card.appendChild(acts);
+    list.appendChild(card);
+  });
+}
+
+/* ════════════ المتجر ════════════ */
+function getItem(id) { return ITEM_BY_ID[id]; }
+
+function syncShopTabs() {
+  document.querySelectorAll('.tab').forEach(b => b.classList.toggle('active', b.dataset.tab === shopTab));
+}
+
+function renderShop() {
+  const list = $('shopList');
+  list.innerHTML = '';
+  const items = shopTab === 'ships' ? SHIPS : BACKGROUNDS;
+  const lvl = levelOf(state.xp);
+
+  items.forEach(item => {
+    const owned = state.owned.includes(item.id);
+    const equipped = state.equipped[item.cat] === item.id;
+    const locked = !owned && (item.req_level || 0) > lvl;
+
+    const card = document.createElement('div');
+    card.className = 'card' + (locked ? ' locked' : '');
+    if (item.rarity) card.style.setProperty('--rc', RARITY_COLORS[item.rarity]);
+
+    const th = document.createElement('div');
+    th.className = 'thumb';
+    th.appendChild(itemImage(item, 56, 46));
+    card.appendChild(th);
+
+    let html = '<div class="nm">' + item.name + '</div>';
+    if (item.cat === 'ships') {
+      html += '<div class="sub">⏱ ' + item.fishing_seconds + ' ث لكل صيدة · 🐟 ' +
+        item.fish.slice(0, 3).map(id => FISH[id] ? FISH[id].name : id).join('، ') + '</div>';
+    }
+    const price = owned ? '✓ مملوك' : (locked ? '🔒 يتطلب المستوى ' + item.req_level : '💰 ' + item.price_coins.toLocaleString());
+    html += '<div class="pr">' + price + '</div>';
+    const info = document.createElement('div');
+    info.className = 'info';
+    info.innerHTML = html;
+    card.appendChild(info);
+
+    const acts = document.createElement('div');
+    acts.className = 'acts';
+    if (!owned) {
+      acts.appendChild(makeBtn(locked ? 'مقفل' : 'شراء', 'btn gold', () => buyItem(item.id), locked));
+    } else if (!equipped) {
+      acts.appendChild(makeBtn('تركيب', 'btn', () => equipItem(item.id)));
+    } else {
+      acts.appendChild(makeBtn('مُركّب ✓', 'btn', null, true));
+    }
+    if (item.cat === 'backgrounds' && !equipped) {
+      acts.appendChild(makeBtn('معاينة', 'btn alt', () => previewBackground(item.id)));
+    }
+    card.appendChild(acts);
+    list.appendChild(card);
+  });
+}
+
+function buyItem(id) {
+  const item = getItem(id);
+  if (!item || state.owned.includes(id)) return;
+  if (levelOf(state.xp) < (item.req_level || 0)) { showMessage('🔒 تحتاج المستوى ' + item.req_level); return; }
+  if (state.coins < item.price_coins) { showMessage('💰 الذهب غير كافٍ'); return; }
+  state.coins -= item.price_coins;
+  state.owned.push(id);
+  saveState();
+  render();
+  renderShop();
+  beep(780, 0.12);
+  showMessage('✅ تم شراء ' + item.name);
+  log('🛒 اشتريت ' + item.name);
+  checkAchievements();
+}
+
+function equipItem(id) {
+  const item = getItem(id);
+  if (!item || !state.owned.includes(id)) return;
+  if (currentTripState !== TS.IDLE) { showMessage('⚠️ لا يمكن التغيير أثناء الرحلة'); return; }
+  state.equipped[item.cat] = id;
+  saveState();
+  applyEquipped();
+  renderShop();
+  showMessage('⚓ تم تركيب ' + item.name);
+}
+
+function getBgStyle(id) {
+  const item = getItem(id);
+  if (item && item.img) return "url('" + item.img + "') center/cover no-repeat," + GRADIENT_BG;
+  return GRADIENT_BG;
+}
+
+function applyBackground(id) {
+  const scene = $('scene');
+  if (scene) scene.style.background = getBgStyle(id);
+}
+
+function previewBackground(id) {
+  const item = getItem(id);
+  if (!item) return;
+  if (previewTimer) clearTimeout(previewTimer);
+  previewBackId = id;
+  applyBackground(id);
+  showMessage('👁 معاينة ' + item.name + ' — 5 ثوانٍ');
+  previewTimer = setTimeout(() => { previewBackId = null; applyEquipped(); }, 5000);
+}
+
+function applyEquipped() {
+  if (previewBackId) return;
+  applyBackground(state.equipped.backgrounds);
+  applyShip();
+}
+
+/* ════════════ المكافأة اليومية ════════════ */
+function todayKey(d) {
+  d = d || new Date();
+  return d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate();
+}
+function yesterdayKey() {
+  const d = new Date();
+  d.setDate(d.getDate() - 1);
+  return todayKey(d);
+}
+function canClaimDaily() { return state.daily.last !== todayKey(); }
+function nextStreak() {
+  return state.daily.last === yesterdayKey() ? (state.daily.streak || 0) + 1 : 1;
+}
+function dailyCoins(streak) { return 200 + Math.min(streak, 30) * 50; }
+
+function timeToMidnight() {
+  const n = new Date(), m = new Date(n);
+  m.setHours(24, 0, 0, 0);
+  const ms = m - n;
+  return Math.floor(ms / 3600000) + ' س ' + Math.floor((ms % 3600000) / 60000) + ' د';
+}
+
+function claimDaily() {
+  if (!canClaimDaily()) return;
+  const s = nextStreak();
+  const coins = dailyCoins(s);
+  let gems = 0;
+  state.coins += coins;
+  if (s % 7 === 0) { gems = 10; state.gems += gems; }
+  state.daily = { last: todayKey(), streak: s };
+  saveState();
+  render();
+  renderDaily();
+  fly('+' + coins + ' 💰', $('giftBtn'));
+  beep(990, 0.15);
+  showMessage('🎁 اليوم ' + s + ' — +' + coins + (gems ? ' و 10 💎' : ''));
+  hook('onDaily');
+  checkAchievements();
+}
+
+function renderDaily() {
+  const can = canClaimDaily();
+  const streak = state.daily.streak || 0;
+  $('dailyHero').innerHTML =
+    '<div class="muted">سلسلة الأيام</div>' +
+    '<div class="big">🔥 ' + streak + ' يوم</div>' +
+    '<div class="muted" style="margin-top:6px">المكافأة القادمة: ' + dailyCoins(can ? nextStreak() : streak + 1).toLocaleString() + ' 💰</div>';
+  const btn = $('claimBtn');
+  btn.disabled = !can;
+  btn.textContent = can ? '🎁 استلم المكافأة' : '✓ استلمت مكافأة اليوم';
+  $('dailyInfo').textContent = can ? 'مكافأتك جاهزة الآن' : 'تتجدد بعد ' + timeToMidnight();
+}
+
+/* ════════════ الإنجازات ════════════ */
+function checkAchievements() {
+  ACHIEVEMENTS.forEach(a => {
+    if (state.achv[a.id] || !a.test(state)) return;
+    state.achv[a.id] = true;
+    state.gems += a.gems;
+    saveState();
+    render();
+    showMessage('🏆 إنجاز: ' + a.name + ' +' + a.gems + ' 💎');
+    log('🏆 ' + a.name + ' — ' + a.desc);
+    beep(1040, 0.2);
+  });
+}
+
+function renderAchv() {
+  const list = $('achvList');
+  list.innerHTML = '';
+  const done = ACHIEVEMENTS.filter(a => state.achv[a.id]).length;
+  const hero = document.createElement('div');
+  hero.className = 'hero';
+  hero.innerHTML = '<div class="muted">المنجز</div><div class="big">' + done + ' / ' + ACHIEVEMENTS.length + '</div>';
+  list.appendChild(hero);
+  ACHIEVEMENTS.forEach(a => {
+    const ok = !!state.achv[a.id];
+    const card = document.createElement('div');
+    card.className = 'card' + (ok ? ' ach-done' : ' locked');
+    card.style.setProperty('--rc', ok ? '#FFD76A' : '#555');
+    card.innerHTML =
+      '<div class="thumb" style="font-size:26px">' + (ok ? '🏆' : '🔒') + '</div>' +
+      '<div class="info"><div class="nm">' + a.name + '</div><div class="sub">' + a.desc + '</div>' +
+      '<div class="pr">' + (ok ? '✓ مكتمل' : '💎 ' + a.gems) + '</div></div>';
+    list.appendChild(card);
+  });
+}
+
+/* ════════════ الإحصاءات ════════════ */
+function renderStats() {
+  const s = state.stats;
+  const items = [
+    [s.caught.toLocaleString(), 'سمكة مصطادة'],
+    [s.trips.toLocaleString(), 'رحلة'],
+    [s.sold.toLocaleString(), 'سمكة مباعة'],
+    [s.earned.toLocaleString(), 'ذهب من البيع'],
+    [s.golden.toLocaleString(), 'صيد ذهبي ✨'],
+    [s.legendary.toLocaleString(), 'صيد أسطوري 🌟'],
+    [levelOf(state.xp), 'المستوى الحالي'],
+    [state.xp.toLocaleString(), 'مجموع الخبرة'],
+  ];
+  $('statsGrid').innerHTML = items.map(([v, k]) =>
+    '<div class="stat"><div class="v">' + v + '</div><div class="k">' + k + '</div></div>'
+  ).join('');
+  $('soundBtn').textContent = soundOn ? '🔊 الصوت: مفعّل' : '🔇 الصوت: مُغلق';
+}
+
+/* ════════════ الشاشات والتنقل ════════════ */
+function setActiveNav(name) {
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.toggle('active', b.dataset.screen === name));
+}
+
+function closeScreen() {
+  document.querySelectorAll('.screen.open').forEach(s => s.classList.remove('open'));
+  activeScreen = null;
+  setActiveNav('home');
+}
+
+function refreshScreen(name) {
+  if (name === 'shop') { syncShopTabs(); renderShop(); }
+  if (name === 'storage') renderStorage();
+  if (name === 'daily') renderDaily();
+  if (name === 'achv') renderAchv();
+  if (name === 'stats') renderStats();
+}
+
+function openScreen(name) {
+  if (activeScreen === name) { closeScreen(); return; }
+  closeScreen();
+  if (name === 'home') return;
+  const el = $('screen-' + name);
+  if (!el) return;
+  el.classList.add('open');
+  activeScreen = name;
+  setActiveNav(name);
+  refreshScreen(name);
+  hook('onScreenOpen', name);
+}
+
+document.querySelectorAll('.nav-btn').forEach(btn => btn.addEventListener('click', () => openScreen(btn.dataset.screen)));
+document.querySelectorAll('[data-close]').forEach(btn => btn.addEventListener('click', closeScreen));
+document.querySelectorAll('.tab').forEach(btn => btn.addEventListener('click', () => {
+  shopTab = btn.dataset.tab;
+  syncShopTabs();
+  renderShop();
+}));
+$('sortSel').onchange = function () { sortMode = this.value; renderStorage(); };
+$('sellAllBtn').onclick = sellAll;
+$('claimBtn').onclick = claimDaily;
+$('soundBtn').onclick = function () {
+  soundOn = !soundOn;
+  localStorage.setItem(SOUND_KEY, soundOn ? 'on' : 'off');
+  renderStats();
+};
+$('giftBtn').onclick = () => openScreen('daily');
+$('playerBox').onclick = function () {
+  const n = prompt('اسم القبطان:', state.name);
+  if (n && n.trim()) { state.name = n.trim().slice(0, 14); saveState(); render(); }
+};
+
+/* ════════════ الخريطة (أماكن شفافة + وضع تعديل) ════════════ */
+function applyLayout() {
+  document.querySelectorAll('.map-item').forEach(el => {
+    const p = layout[el.dataset.key];
+    if (!p) return;
+    el.style.left = (p.x * 100) + '%';
+    el.style.top = (p.y * 100) + '%';
+  });
+}
+
+function onMapTap(key) {
+  if (editMode) return;
+  if (key === 'shipMarket') { shopTab = 'ships'; openScreen('shop'); return; }
+  if (key === 'fishMarket') { openScreen('storage'); return; }
+  if (key === 'harbor' && currentTripState === TS.IDLE) showMessage('👆 اضغط القارب لتبدأ الرحلة');
+}
+
+function bindMap() {
+  const scene = $('scene');
+  document.querySelectorAll('.map-item').forEach(el => {
+    el.addEventListener('click', () => onMapTap(el.dataset.key));
+  });
+  scene.addEventListener('pointerdown', function (e) {
+    const item = e.target.closest('.map-item');
+    if (!item || !editMode) return;
+    dragKey = item.dataset.key;
+    if (item.setPointerCapture) item.setPointerCapture(e.pointerId);
+    e.preventDefault();
+  });
+  scene.addEventListener('pointermove', function (e) {
+    if (!dragKey) return;
+    const r = scene.getBoundingClientRect();
+    layout[dragKey] = {
+      x: clamp((e.clientX - r.left) / r.width, 0.08, 0.92),
+      y: clamp((e.clientY - r.top) / r.height, 0.12, 0.8),
+    };
+    applyLayout();
+  });
+  const end = () => { dragKey = null; };
+  scene.addEventListener('pointerup', end);
+  scene.addEventListener('pointercancel', end);
+}
+
+function resetLayout() {
+  layout = JSON.parse(JSON.stringify(DEFAULT_LAYOUT));
+  applyLayout();
+  saveLayout();
+  showMessage('↺ رجعت الأماكن الأصلية');
+  log('🗺 أُعيد ضبط التخطيط');
+}
+
+function toggleEdit() {
+  editMode = !editMode;
+  document.body.classList.toggle('edit-on', editMode);
+  const t = $('editToggle');
+  t.textContent = editMode ? '✅' : '🛠';
+  t.classList.toggle('on', editMode);
+  if (editMode) {
+    if (currentTripState !== TS.IDLE) showMessage('⚠️ عدّل الأماكن بعد انتهاء الرحلة');
+    else showMessage('✏️ اسحب الأماكن ثم اضغط ✅');
+    hideTarget();
+  } else {
+    saveLayout();
+    if (currentTripState === TS.IDLE) {
+      P.x = layout.harbor.x; P.y = layout.harbor.y;
+      P.tx = P.x; P.ty = P.y;
+      P.vx = 0; P.vy = 0;
+      P.hasTarget = false;
+      applyBoatTransform();
+    }
+    showMessage('💾 تم حفظ أماكن الخريطة');
+    log('🗺 حُفظ موقع الميناء والأسواق');
+  }
+}
+
+/* ════════════ اللمس ════════════ */
+$('editToggle').onclick = toggleEdit;
+$('editReset').onclick = function () { if (editMode) resetLayout(); };
+
+$('boat').addEventListener('click', function () {
+  if (editMode) return;
+  if (currentTripState === TS.IDLE) startTrip();
+  else if (currentTripState === TS.FISHING) startReturn();
+});
+
+$('scene').addEventListener('pointerdown', function (e) {
+  if (editMode) return;
+  if (e.target.closest('.map-item, #boat')) return;
+  if (currentTripState !== TS.IDLE) return;
+  const r = $('scene').getBoundingClientRect();
+  setTarget((e.clientX - r.left) / r.width, (e.clientY - r.top) / r.height);
+});
+
+/* ════════════ الحلقة الرئيسية ════════════ */
+setInterval(function () {
+  const now = Date.now();
+  const dt = Math.min(0.1, (now - lastTick) / 1000);
+  lastTick = now;
+
+  updateBoatPhysics(dt);
+
+  if (state.trip && currentTripState === TS.FISHING) {
+    if (now >= state.trip.endsAt) {
+      showMessage('⏰ انتهت الرحلة، عد للميناء');
+      log('⏰ انتهت الرحلة');
+      startReturn();
+    } else {
+      const ship = SHIP_BY_ID[state.trip.shipId] || currentShip();
+      if (Math.random() < dt * catchChancePerSecond(ship)) {
+        const id = pickFishFor(ship);
+        const key = Math.random() < GOLD_CHANCE ? 'g_' + id : id;
+        state.trip.catches.push(key);
+        catchPop(isGolden(key) ? '✨' + FISH[id].emoji : FISH[id].emoji);
+        beep(isGolden(key) ? 1320 : 880, 0.05);
+        saveState();
+        hook('onCatch', id);
+      }
+    }
+  }
+
+  if (now - lastRender > 250) {
+    render();
+    lastRender = now;
+  }
+  hook('tick', dt);
+}, TICK_MS);
+
+setInterval(rollEvent, EVENT_EVERY);
+
+/* ════════════ أدوات التطوير ════════════ */
+function setupDevTools() {
+  if (!DEV_MODE) return;
+  const bar = document.createElement('div');
+  bar.style.cssText = 'position:fixed;top:200px;left:6px;z-index:50;display:flex;flex-direction:column;gap:6px;';
+  const tools = [
+    ['🔄', 'إعادة تعيين الحفظ', () => {
+      if (confirm('حذف كل التقدم؟')) { localStorage.removeItem(SAVE_KEY); localStorage.removeItem(LAYOUT_KEY); location.reload(); }
+    }],
+    ['⏩', 'إنهاء الرحلة', () => { if (state.trip) state.trip.endsAt = Date.now(); }],
+    ['🐟', 'إضافة 5 أسماك', () => {
+      for (let i = 0; i < 5; i++) {
+        const k = pickFishFor(currentShip());
+        state.inventory[k] = (state.inventory[k] || 0) + 1;
+      }
+      saveState(); renderStorage();
+    }],
+  ];
+  tools.forEach(([icon, title, fn]) => {
+    const b = document.createElement('button');
+    b.textContent = icon;
+    b.title = title;
+    b.style.cssText = 'width:36px;height:36px;border-radius:50%;border:2px solid #FFD76A;background:rgba(0,0,0,.6);color:#fff;font-size:16px;padding:0;';
+    b.onclick = fn;
+    bar.appendChild(b);
+  });
+  $('app').appendChild(bar);
+}
+
+/* ════════════ البدء ════════════ */
+ensureMarket();
+applyLayout();
+bindMap();
+initBoatPosition();
+
+if (state.trip) {
+  if (Date.now() >= state.trip.endsAt) {
+    endTrip();
+  } else {
+    currentTripState = TS.FISHING;
+    setTarget(layout.sea.x, layout.sea.y);
+    showMessage('🌊 استرجعت رحلتك السابقة');
+    log('🔄 استرجعت رحلة جارية');
+  }
+}
+
+applyEquipped();
+rollEvent();
+setActiveNav('home');
+render();
+renderStorage();
+checkAchievements();
+setupDevTools();
+log('🎮 مرحباً ' + state.name + '، اللعبة جاهزة');
+hook('onGameStart');
+
+window.addEventListener('beforeunload', saveState);
+document.addEventListener('visibilitychange', function () {
+  if (document.visibilityState === 'hidden') saveState();
+});
+</script>
+
+<script>
+/* ═══ ModuleRegistry — نظام الوحدات (ES5) ═══ */
+(function () {
+  var MODULE_LIST = ['crew'];   // ← أضف اسم الوحدة هنا فقط
+
+  var modules = {};
+  var order = [];
+  var ctx = null;
+  var ready = false;
+
+  function logErr(where, e) { console.error('[Registry] ' + where, e); }
+
+  function guard(id, method, fn) {
+    try { fn(); }
+    catch (e) {
+      logErr(id + '.' + method, e);
+      if (ctx) ctx.ui.toast('⚠️ خطأ في ' + id);
+    }
+  }
+
+  function buildCtx() {
+    var c = {
+      ui: {
+        toast: function (m) { if (typeof showMessage === 'function') showMessage(m); },
+        fly: function (t, a) { if (typeof fly === 'function') fly(t, a); },
+        beep: function (f, d) { if (typeof beep === 'function') beep(f, d); },
+        confirm: function (t, fn) { if (window.confirm(t)) fn(); },
+        showScreen: function (n) { if (typeof openScreen === 'function') openScreen(n); },
+        closeScreen: function () { if (typeof closeScreen === 'function') closeScreen(); }
+      },
+      assets: {
+        src: function (cat, id) { return 'assets/' + cat + '/' + id + '.webp'; },
+        image: function (cat, id, emoji, w) {
+          var s = w || 56;
+          var url = 'assets/' + cat + '/' + id + '.webp';
+          return '<img src="' + url + '" style="width:' + s + 'px;height:' + s + 'px;object-fit:contain" ' +
+            'onerror="this.outerHTML=\'' + emoji + '\'">';
+        }
+      },
+      save: function () { if (typeof saveState === 'function') saveState(); },
+      get: function (k) { return state[k]; },
+      set: function (k, v) { state[k] = v; c.save(); },
+      helpers: {
+        el: function (id) { return document.getElementById(id); },
+        format: function (n) { return Number(n).toLocaleString(); },
+        random: function (a, b) { return Math.random() * (b - a) + a; },
+        clamp: function (v, lo, hi) { return Math.max(lo, Math.min(hi, v)); },
+        now: function () { return Date.now(); }
+      },
+      modules: {
+        get: function (id) { return modules[id] || null; },
+        all: function () { return order.map(function (id) { return modules[id]; }); }
+      }
+    };
+    Object.defineProperty(c, 'state', { get: function () { return state; } });
+    return c;
+  }
+
+  function register(mod) {
+    if (!mod || !mod.id) { logErr('register', 'no id'); return; }
+    if (modules[mod.id]) { logErr('register', 'dup id: ' + mod.id); return; }
+    modules[mod.id] = mod;
+    order.push(mod.id);
+  }
+
+  function callHook(name) {
+    if (!ready) return;
+    var args = [ctx].concat(Array.prototype.slice.call(arguments, 1));
+    order.slice().forEach(function (id) {
+      var m = modules[id];
+      if (m && typeof m[name] === 'function') {
+        guard(id, name, function () { m[name].apply(m, args); });
+      }
+    });
+  }
+
+  function saveAll(st) {
+    if (!ready) return;
+    order.forEach(function (id) {
+      var m = modules[id];
+      if (m && typeof m.save === 'function') guard(id, 'save', function () { m.save(st); });
+    });
+  }
+
+  function addScreen(s) {
+    if (!s || !s.id || document.getElementById(s.id)) return;
+    var sec = document.createElement('section');
+    sec.className = 'screen';
+    sec.id = s.id;
+    sec.innerHTML = '<div class="sh"><span class="st">' + (s.title || '') +
+      '</span><button class="close-btn" data-close>✕</button></div>' +
+      '<div class="sb">' + (s.html || '') + '</div>';
+    sec.querySelector('[data-close]').onclick = function () { closeScreen(); };
+    document.getElementById('app').appendChild(sec);
+  }
+
+  function addNav(b) {
+    var nav = document.getElementById('bottombar');
+    if (!nav || !b || !b.id || document.getElementById('nav-' + b.id)) return;
+    var btn = document.createElement('button');
+    btn.className = 'nav-btn';
+    btn.id = 'nav-' + b.id;
+    btn.setAttribute('data-screen', b.id);
+    btn.innerHTML = '<span class="icon">' + (b.icon || '❓') + '</span>' + (b.label || '');
+    btn.onclick = function () { if (b.onClick) b.onClick(); };
+    nav.appendChild(btn);
+    nav.style.gridTemplateColumns = 'repeat(' + nav.children.length + ',minmax(0,1fr))';
+  }
+
+  function initAll() {
+    if (ready) return;
+    ctx = buildCtx();
+    ready = true;
+
+    order = order.filter(function (id) {
+      var deps = modules[id].dependencies || [];
+      for (var i = 0; i < deps.length; i++) {
+        if (!modules[deps[i]]) {
+          logErr(id, 'missing dep: ' + deps[i]);
+          delete modules[id];
+          return false;
+        }
+      }
+      return true;
+    });
+
+    var saved = {};
+    try { saved = JSON.parse(localStorage.getItem(SAVE_KEY) || '{}') || {}; } catch (e) {}
+
+    order.forEach(function (id) {
+      var m = modules[id];
+      if (typeof m.init === 'function') guard(id, 'init', function () { m.init(ctx); });
+    });
+    order.forEach(function (id) {
+      var m = modules[id];
+      if (typeof m.load === 'function') guard(id, 'load', function () { m.load(saved); });
+    });
+    order.forEach(function (id) {
+      var m = modules[id];
+      if (typeof m.renderScreen === 'function') {
+        guard(id, 'renderScreen', function () { addScreen(m.renderScreen(ctx)); });
+      }
+    });
+    order.forEach(function (id) {
+      var m = modules[id];
+      if (typeof m.renderBottomNav === 'function') {
+        guard(id, 'renderBottomNav', function () { addNav(m.renderBottomNav(ctx)); });
+      }
+    });
+
+    console.log('[Registry] ' + order.length + ' modules ready');
+  }
+
+  /* تغليف openScreen عشان الوحدات تستقبل onScreenOpen */
+  if (typeof window.openScreen === 'function') {
+    var baseOpen = window.openScreen;
+    window.openScreen = function (name) {
+      baseOpen(name);
+      callHook('onScreenOpen', name);
+    };
+  }
+
+  window.ModuleRegistry = {
+    register: register,
+    initAll: initAll,
+    callHook: callHook,
+    saveAll: saveAll,
+    get: function (id) { return modules[id] || null; },
+    all: function () { return order.map(function (id) { return modules[id]; }); },
+    context: function () { return ctx; }
+  };
+
+  function loadNext(i) {
+    if (i >= MODULE_LIST.length) { initAll(); return; }
+    var s = document.createElement('script');
+    s.src = 'modules/' + MODULE_LIST[i] + '.js';
+    s.onload = function () { loadNext(i + 1); };
+    s.onerror = function () { logErr('load', s.src); loadNext(i + 1); };
+    document.body.appendChild(s);
+  }
+  loadNext(0);
+})();
+</script>
+</body>
+</html>

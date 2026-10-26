@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content">
+<meta name="theme-color" content="#07162b">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="مملكة القراصنة">
+<title>👑 مملكة القراصنة</title>
+<link rel="stylesheet" href="css/main.css?v=1792360553">
+<link rel="stylesheet" href="css/nav.css?v=1792360553">
+</head>
+<body>
+<div id="app">
+  <section class="screen" id="screen-global_chat"></section>
+
+  <div id="scene" data-light-rays>
+    <video id="bg-video" autoplay loop muted playsinline webkit-playsinline style="position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover;z-index:0;pointer-events:none;">
+      <source src="assets/videos/bg-eiffel-night.mp4?v=1792360553" type="video/mp4">
+    </video>
+
+    <div class="map-item harbor" data-key="harbor">
+      <div class="map-box"><span class="map-icon">⚓</span></div>
+      <div class="map-label">الميناء</div>
+    </div>
+    <div class="map-item market" data-key="shipMarket">
+      <div class="map-box"><span class="map-icon">🛥</span></div>
+      <div class="map-label">سوق السفن</div>
+    </div>
+    <div class="map-item market" data-key="fishMarket">
+      <div class="map-box"><span class="map-icon">🐟</span></div>
+      <div class="map-label">سوق السمك</div>
+    </div>
+    <div class="map-item sea" data-key="sea">
+      <div class="map-box"><span class="map-icon">🌊</span></div>
+      <div class="map-label">البحر</div>
+    </div>
+    <div id="boat"></div>
+    <div id="target"></div>
+  </div>
+
+  <header id="topbar" class="molok-glass">
+    <div class="player" id="playerBox" title="تغيير الاسم">
+      <div class="avatar">👤</div>
+      <div class="pinfo">
+        <div id="pname">القبطان</div>
+        <div class="lvlbar"><div id="lvlFill"></div></div>
+        <div id="lvlTxt">مستوى 1</div>
+      </div>
+    </div>
+    <div class="resources">
+      <div class="res"><img src="assets/icons/icon-coin-3d.png" style="width:18px;height:18px;vertical-align:middle;margin-left:4px;margin-right:2px;"><b id="coins">0</b></div>
+      <div class="res"><img src="assets/icons/icon-gem-3d.png" style="width:18px;height:18px;vertical-align:middle;margin-left:4px;margin-right:2px;"><b id="gems">0</b></div>
+      <div class="res"><img src="assets/fish/sardine.webp" style="width:18px;height:18px;vertical-align:middle;margin-left:4px;margin-right:2px;"><b id="fishCount">0</b></div>
+    </div>
+    <button class="gift-btn" id="giftBtn" title="المكافأة اليومية" style="display:none">🎁</button>
+  </header>
+
+  <div id="eventBanner"></div>
+  <div id="message"></div>
+  <div id="notifs"></div>
+  <div id="progress"><div id="progressFill"></div><div id="progressText">0%</div></div>
+
+  <nav id="bottombar">
+    <button class="nav-btn" data-screen="settings">
+      <img class="nav-ico" src="assets/icons/nav-icon-settings-DtT5y51M.webp" alt="">
+      <span class="nav-lbl">إعدادات</span>
+    </button>
+    <button class="nav-btn" data-screen="global_chat">
+      <img class="nav-ico" src="assets/icons/nav-icon-chat-BUUBBOKs.webp" alt="">
+      <span class="nav-lbl">شات</span>
+      <span class="nav-badge" id="chatBadge" style="display:none">0</span>
+    </button>
+    <button class="nav-btn" data-screen="shop">
+      <img class="nav-ico" src="assets/icons/nav-icon-shop-Wr0N76np.webp" alt="">
+      <span class="nav-lbl">متجر</span>
+    </button>
+    <button class="nav-btn" data-screen="storage">
+      <img class="nav-ico" src="assets/icons/nav-icon-inventory-D66Fo-zf.webp" alt="">
+      <span class="nav-lbl">مخزن</span>
+    </button>
+    <button class="nav-btn" data-screen="friends">
+      <img class="nav-ico" src="assets/icons/nav-icon-friends-BIhvMBB5.webp" alt="">
+      <span class="nav-lbl">أصدقاء</span>
+      <span class="nav-badge" id="friendsBadge" style="display:none">0</span>
+    </button>
+    <button class="nav-btn" data-screen="leaderboard">
+      <img class="nav-ico" src="assets/icons/nav-icon-arena-Dsktrz9V.webp" alt="">
+      <span class="nav-lbl">ترتيب</span>
+    </button>
+    <button class="nav-btn" data-screen="tribe">
+      <img class="nav-ico" src="assets/icons/nav-icon-tribe-CawiMLsF.webp" alt="">
+      <span class="nav-lbl">قبيلة</span>
+    </button>
+  </nav>
+
+  <section class="screen" id="screen-shop">
+    <div class="sh"><span class="st">🛒 المتجر</span><button class="close-btn" data-close>✕</button></div>
+    <div class="tabs">
+      <button class="tab active" data-tab="ships">⛵ سفن</button>
+      <button class="tab" data-tab="backgrounds">🏞 خلفيات</button>
+    </div>
+    <div class="sb" id="shopList"></div>
+  </section>
+
+  <section class="screen" id="screen-daily">
+    <div class="sh"><span class="st">🎁 المكافأة اليومية</span><button class="close-btn" data-close>✕</button></div>
+    <div class="sb">
+      <div class="hero" id="dailyHero"></div>
+      <div class="muted" id="dailyInfo" style="margin-bottom:12px"></div>
+      <button class="molok-gold-btn btn gold wide" id="claimBtn" data-star-border>استلم المكافأة</button>
+      <div class="muted" style="margin-top:14px;line-height:1.8">
+        كل يوم تزيد المكافأة، وكل 7 أيام تحصل على 10 💎. إذا فاتك يوم تبدأ السلسلة من جديد.
+      </div>
+    </div>
+  </section>
+
+  <section class="screen" id="screen-achv">
+    <div class="sh"><span class="st">🏆 الإنجازات والمهام</span><button class="close-btn" data-close>✕</button></div>
+    <div class="sb" id="achvList"></div>
+  </section>
+
+  <section class="screen" id="screen-stats">
+    <div class="sh"><span class="st">📊 إحصاءات الصياد</span><button class="close-btn" data-close>✕</button></div>
+    <div class="sb">
+      <div class="stat-grid" id="statsGrid"></div>
+      <button class="btn alt wide" id="soundBtn" style="margin-top:14px">🔊 الصوت</button>
+    </div>
+  </section>
+
+  <section class="screen" id="screen-profile">
+    <div class="sh"><span class="st">👤 الملف الشخصي</span><button class="close-btn" data-close>✕</button></div>
+    <div class="sb" id="profileBody"></div>
+  </section>
+
+  <section class="screen" id="screen-inventory"></section>
+
+  <section class="screen" id="screen-settings">
+    <div class="sh"><span class="st">⚙️ الإعدادات</span><button class="close-btn" data-close>✕</button></div>
+    <div class="sb" id="settingsBody"></div>
+  </section>
+
+  <section class="screen" id="screen-chat">
+    <div class="sh"><span class="st">💬 الشات</span><button class="close-btn" data-close>✕</button></div>
+    <div class="sb">
+      <div class="hero" style="text-align:center;padding:40px 20px">
+        <div style="font-size:64px;line-height:1;margin-bottom:16px">💬</div>
+        <div class="big" style="font-size:20px">قريباً</div>
+        <div class="muted" style="margin-top:8px;line-height:1.8">الشات العام + الخاص + القبيلة جاي بالطريق</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="screen" id="screen-friends">
+    <div class="sh"><span class="st">👥 الأصدقاء</span><button class="close-btn" data-close>✕</button></div>
+    <div class="sb">
+      <div class="hero" style="text-align:center;padding:40px 20px">
+        <div style="font-size:64px;line-height:1;margin-bottom:16px">👥</div>
+        <div class="big" style="font-size:20px">قريباً</div>
+        <div class="muted" style="margin-top:8px;line-height:1.8">قائمة الأصدقاء + طلبات الصداقة + البحث عن قبطان</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="screen" id="screen-tribe">
+    <div class="sh"><span class="st">🏴 القبيلة</span><button class="close-btn" data-close>✕</button></div>
+    <div class="sb">
+      <div class="hero" style="text-align:center;padding:40px 20px">
+        <div style="font-size:64px;line-height:1;margin-bottom:16px">🏴</div>
+        <div class="big" style="font-size:20px">قريباً</div>
+        <div class="muted" style="margin-top:8px;line-height:1.8">نظام القبائل الكامل: إنشاء، انضمام، ترقية، خزنة، فعاليات</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="screen" id="screen-leaderboard">
+    <div class="sh"><span class="st">🏆 الترتيب</span><button class="close-btn" data-close>✕</button></div>
+    <div class="sb">
+      <div class="hero" style="text-align:center;padding:40px 20px">
+        <div style="font-size:64px;line-height:1;margin-bottom:16px">🏆</div>
+        <div class="big" style="font-size:20px">قريباً</div>
+        <div class="muted" style="margin-top:8px;line-height:1.8">ترتيب اللاعبين: XP، ذهب، جواهر، صيد، قبائل</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="screen" id="screen-storage"></section>
+
+  <div id="fleet-screen" style="display:none"></div>
+
+  <button id="editToggle" title="وضع التعديل">🛠</button>
+  <button id="editReset" title="إرجاع الأماكن الأصلية">↺</button>
+</div>
+
+<script src="data/fish.js"></script>
+<script src="data/ships.js"></script>
+<script src="data/progression.js"></script>
+
+<script src="assets-loader.js"></script>
+<script src="js/app_height.js"></script>
+
+<script src="js/01_config.js"></script>
+<script src="js/02_backgrounds.js"></script>
+<script src="js/03_achievements.js"></script>
+<script src="js/04_state.js"></script>
+<script src="js/05_runtime.js"></script>
+<script src="js/06_effects.js"></script>
+<script src="js/07_market.js"></script>
+<script src="js/07b_ships_rpc.js"></script>
+<script src="js/08_events.js"></script>
+<script src="js/09_fishing.js"></script>
+<script src="js/10_boat.js"></script>
+<script src="js/11_trip.js"></script>
+<script src="js/12_render.js"></script>
+<script src="js/13_storage.js"></script>
+<script src="js/14_shop.js"></script>
+<script src="js/15_daily.js"></script>
+<script src="js/16_achievements_screen.js"></script>
+<script src="js/17_stats.js"></script>
+<script src="js/18_navigation.js"></script>
+<script src="js/19_map.js"></script>
+<script src="js/20_input.js"></script>
+<script src="js/21_loop.js"></script>
+<script src="js/22_devtools.js"></script>
+
+<script src="js/registry.js?v=999"></script>
+<script src="js/22_fleet_fix.js"></script>
+<!-- <script src="js/24_ship_physics.js"></script> -->
+<script src="js/25_fish_discovery.js"></script>
+<!-- <script src="js/26_fishing_physics.js"></script> -->
+<script src="js/27_compact_panel.js"></script>
+
+<script src="js/vendor/gsap.min.js"></script>
+<script src="js/vendor/ScrollTrigger.min.js"></script>
+<script src="js/vendor/lenis.min.js"></script>
+<script src="js/28_motion.js"></script>
+<script src="js/29_ui.js"></script>
+<script src="js/30_username.js"></script>
+<script src="js/23_boot.js"></script>
+
+<script>
+(function() {
+  var errs = [];
+  window.addEventListener('error', function(e) {
+    errs.push({ msg: String(e.message || 'unknown'), file: (e.filename || '-').split('/').pop(), line: e.lineno || '-' });
+    render();
+  });
+  window.addEventListener('unhandledrejection', function(e) {
+    var r = e.reason;
+    errs.push({ msg: 'Promise: ' + (r && r.message ? r.message : String(r)), file: '-', line: '-' });
+    render();
+  });
+  function render() {
+    var el = document.getElementById('_dbg');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = '_dbg';
+      el.style.cssText = 'position:fixed;bottom:0;left:0;right:0;max-height:50%;overflow:auto;background:rgba(30,0,0,.97);color:#fca;font:11px ui-monospace,Menlo,monospace;padding:10px;z-index:99999;border-top:3px solid #f44;direction:ltr;text-align:left;';
+      document.body.appendChild(el);
+    }
+    el.innerHTML = '<div style="color:#fff;font-size:13px;font-weight:bold;margin-bottom:8px">' + errs.length + ' errors</div>' +
+      errs.map(function(e, i) {
+        return '<div style="margin-bottom:5px;padding:5px 7px;background:rgba(0,0,0,.5);border-radius:4px;border-left:3px solid #f44;line-height:1.4">' +
+          '[' + (i+1) + '] <span style="color:#9cf">' + e.file + ':' + e.line + '</span> - <span style="color:#faa">' + e.msg + '</span></div>';
+      }).join('');
+  }
+})();
+</script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  document.body.addEventListener('click', function(e) {
+    if (e.target.closest('button') || e.target.closest('.nav-btn') || e.target.closest('.tab') || e.target.closest('.lb-btn')) {
+      if (typeof beep === 'function') {
+        beep(880, 0.04);
+      }
+    }
+  });
+});
+</script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  var vid = document.getElementById('bg-video');
+  if (vid) {
+    vid.muted = true;
+    vid.play().catch(function(e) {
+      console.log('Video autoplay blocked', e);
+    });
+    vid.style.position = 'fixed';
+    vid.style.top = '0';
+    vid.style.left = '0';
+    vid.style.width = '100vw';
+    vid.style.height = '100vh';
+    vid.style.zIndex = '-1';
+    vid.style.objectFit = 'cover';
+  }
+});
+</script>
+
+</body>
+</html>

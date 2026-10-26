@@ -1,0 +1,786 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="ar">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>لوحة المعلومات</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: #000;
+            color: #fff;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 500px;
+            margin: 0 auto;
+        }
+        
+        /* الساعة 12 */
+        .clock-12-section {
+            text-align: center;
+            padding: 20px 0 10px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        
+        .clock-12-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 5px 0;
+        }
+        
+        .clock-ar {
+            font-size: 42px;
+            font-weight: 200;
+            color: #00d4ff;
+            text-shadow: 0 0 20px rgba(0,212,255,0.3);
+            letter-spacing: 1px;
+        }
+        
+        .ampm-ar {
+            font-size: 18px;
+            color: #30d158;
+            margin-right: 8px;
+        }
+        
+        .clock-en {
+            font-size: 42px;
+            font-weight: 200;
+            color: #00d4ff;
+            text-shadow: 0 0 20px rgba(0,212,255,0.3);
+            letter-spacing: 1px;
+            direction: ltr;
+        }
+        
+        .ampm-en {
+            font-size: 18px;
+            color: #30d158;
+            margin-left: 8px;
+        }
+        
+        /* الساعة 24 */
+        .clock-24-section {
+            text-align: center;
+            padding: 15px 0;
+            background: rgba(0,212,255,0.08);
+            border-bottom: 1px solid rgba(0,212,255,0.2);
+        }
+        
+        .clock-24-label {
+            font-size: 12px;
+            color: #00d4ff;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            margin-bottom: 5px;
+        }
+        
+        .clock-24 {
+            font-size: 36px;
+            font-weight: 600;
+            color: #00d4ff;
+            letter-spacing: 3px;
+            font-family: 'SF Mono', monospace;
+        }
+        
+        .clock-24-seconds {
+            font-size: 20px;
+            color: #8e8e93;
+        }
+        
+        /* اليوم */
+        .day-section {
+            text-align: center;
+            padding: 20px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        
+        .day-name {
+            font-size: 36px;
+            font-weight: 600;
+            color: #ffd60a;
+        }
+        
+        /* التواريخ */
+        .date-section {
+            padding: 15px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        
+        .date-label {
+            font-size: 13px;
+            color: #8e8e93;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 8px;
+        }
+        
+        .date-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            width: 100%;
+        }
+        
+        .date-written {
+            font-size: 22px;
+            font-weight: 600;
+        }
+        
+        .date-numeric {
+            font-size: 18px;
+            color: #8e8e93;
+            font-family: 'SF Mono', monospace;
+            direction: ltr;
+        }
+        
+        .hijri-written { color: #ffd60a; }
+        .hijri-numeric { color: #ffd60a; opacity: 0.7; }
+        
+        .miladi-written { color: #ff9f0a; }
+        .miladi-numeric { color: #ff9f0a; opacity: 0.7; }
+        
+        /* الموقع */
+        .location-section {
+            padding: 15px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        
+        .location-input {
+            display: flex;
+            gap: 10px;
+            margin-top: 8px;
+        }
+        
+        .location-input input {
+            flex: 1;
+            background: rgba(255,255,255,0.08);
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 12px;
+            padding: 12px 15px;
+            color: #fff;
+            font-size: 16px;
+            outline: none;
+        }
+        
+        .location-input input::placeholder {
+            color: #8e8e93;
+        }
+        
+        .location-btn {
+            background: #00d4ff;
+            color: #000;
+            border: none;
+            border-radius: 12px;
+            padding: 12px 20px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        
+        .location-btn.gps {
+            background: #30d158;
+        }
+        
+        .location-display {
+            text-align: center;
+            padding: 10px 0;
+            font-size: 18px;
+            color: #00d4ff;
+        }
+        
+        /* البطاقات */
+        .card {
+            background: rgba(255,255,255,0.05);
+            border-radius: 20px;
+            padding: 25px;
+            margin: 15px 0;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        
+        .card-title {
+            font-size: 14px;
+            color: #8e8e93;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .card-title::before {
+            content: '';
+            width: 4px;
+            height: 20px;
+            background: #00d4ff;
+            border-radius: 2px;
+        }
+        
+        /* الطقس */
+        .weather-main {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        
+        .weather-temp {
+            font-size: 56px;
+            font-weight: 300;
+        }
+        
+        .weather-icon {
+            font-size: 70px;
+        }
+        
+        .weather-desc {
+            font-size: 20px;
+            color: #8e8e93;
+            margin-top: 10px;
+        }
+        
+        .weather-details {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-top: 15px;
+        }
+        
+        .weather-item {
+            background: rgba(255,255,255,0.05);
+            padding: 15px;
+            border-radius: 12px;
+            text-align: center;
+        }
+        
+        .weather-item-label {
+            font-size: 12px;
+            color: #8e8e93;
+        }
+        
+        .weather-item-value {
+            font-size: 20px;
+            font-weight: 600;
+            margin-top: 5px;
+        }
+        
+        /* أوقات الصلاة الجديدة */
+        .prayer-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        
+        .prayer-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 18px;
+            border-radius: 16px;
+            background: rgba(255,255,255,0.05);
+            transition: all 0.3s;
+        }
+        
+        .prayer-row.past {
+            opacity: 0.5;
+        }
+        
+        .prayer-row.current {
+            background: rgba(0,212,255,0.15);
+            border: 1px solid rgba(0,212,255,0.3);
+        }
+        
+        .prayer-row.next {
+            background: rgba(255,214,10,0.1);
+            border: 1px solid rgba(255,214,10,0.2);
+        }
+        
+        .prayer-info {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        
+        .prayer-name {
+            font-size: 18px;
+            font-weight: 600;
+        }
+        
+        .prayer-status {
+            font-size: 13px;
+            color: #8e8e93;
+        }
+        
+        .prayer-status.past-status {
+            color: #30d158;
+        }
+        
+        .prayer-status.next-status {
+            color: #ffd60a;
+        }
+        
+        .prayer-time-box {
+            text-align: center;
+        }
+        
+        .prayer-time-12 {
+            font-size: 22px;
+            font-weight: 600;
+        }
+        
+        .prayer-time-24 {
+            font-size: 14px;
+            color: #8e8e93;
+            margin-top: 2px;
+        }
+        
+        /* الصلاة القادمة الكبيرة */
+        .next-prayer-big {
+            text-align: center;
+            padding: 20px;
+            background: rgba(255,214,10,0.08);
+            border-radius: 16px;
+            margin-bottom: 15px;
+            border: 1px solid rgba(255,214,10,0.15);
+        }
+        
+        .next-prayer-big-label {
+            font-size: 14px;
+            color: #ffd60a;
+            margin-bottom: 8px;
+        }
+        
+        .next-prayer-big-name {
+            font-size: 28px;
+            font-weight: 700;
+            color: #ffd60a;
+        }
+        
+        .next-prayer-big-time {
+            font-size: 18px;
+            color: #8e8e93;
+            margin-top: 5px;
+        }
+        
+        .next-prayer-big-countdown {
+            font-size: 16px;
+            color: #00d4ff;
+            margin-top: 8px;
+        }
+        
+        .loading { color: #8e8e93; animation: pulse 1.5s infinite; }
+        .error { color: #ff453a; }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        
+        <!-- 1. الساعة 12 -->
+        <div class="clock-12-section">
+            <div class="clock-12-row">
+                <div>
+                    <span class="clock-ar" id="clockAr">--:--</span>
+                    <span class="ampm-ar" id="ampmAr">--</span>
+                </div>
+                <div dir="ltr">
+                    <span class="clock-en" id="clockEn">--:--</span>
+                    <span class="ampm-en" id="ampmEn">--</span>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 2. الساعة 24 -->
+        <div class="clock-24-section">
+            <div class="clock-24-label">⏰ الساعة العسكرية</div>
+            <div class="clock-24" id="clock24">--:--<<span class="clock-24-seconds" id="seconds24">:--</span></div>
+        </div>
+        
+        <!-- 3. اليوم -->
+        <div class="day-section">
+            <div class="day-name" id="dayName">---</div>
+        </div>
+        
+        <!-- 4. الهجري -->
+        <div class="date-section">
+            <div class="date-label">التاريخ الهجري</div>
+            <div class="date-content">
+                <span class="date-written hijri-written" id="hijriWritten">جاري التحميل...</span>
+                <span class="date-numeric hijri-numeric" id="hijriNumeric">--/--/----</span>
+            </div>
+        </div>
+        
+        <!-- 5. الميلادي -->
+        <div class="date-section">
+            <div class="date-label">التاريخ الميلادي</div>
+            <div class="date-content">
+                <span class="date-written miladi-written" id="miladiWritten">---</span>
+                <span class="date-numeric miladi-numeric" id="miladiNumeric">--/--/----</span>
+            </div>
+        </div>
+        
+        <!-- 6. الموقع -->
+        <div class="location-section">
+            <div class="date-label">📍 الموقع</div>
+            <div class="location-display" id="locationDisplay">لم يتم تحديد الموقع</div>
+            <div class="location-input">
+                <input type="text" id="cityInput" placeholder="اكتب اسم المدينة (مثال: الرياض)">
+                <button class="location-btn" onclick="setManualLocation()">تطبيق</button>
+                <button class="location-btn gps" onclick="setGPSLocation()">📡 GPS</button>
+            </div>
+        </div>
+        
+        <!-- 7. الطقس -->
+        <div class="card">
+            <div class="card-title">الطقس</div>
+            <div id="weatherContent" class="loading">اكتب المدينة أو اضغط GPS</div>
+        </div>
+        
+        <!-- 8. أوقات الصلاة -->
+        <div class="card">
+            <div class="card-title">🕌 أوقات الصلاة</div>
+            <div id="nextPrayerBox"></div>
+            <div class="prayer-list" id="prayerList"></div>
+        </div>
+        
+    </div>
+
+<script>
+var currentLat = null;
+var currentLon = null;
+var currentCity = null;
+var prayerTimings = null;
+
+// ============== الساعات ==============
+function updateClocks() {
+    var now = new Date();
+    var hours = now.getHours();
+    var minutes = String(now.getMinutes()).padStart(2, '0');
+    var seconds = String(now.getSeconds()).padStart(2, '0');
+    var h12 = hours % 12 || 12;
+    var h12Str = String(h12).padStart(2, '0');
+    
+    var ampmAr = hours >= 12 ? 'مساءً' : 'صباحاً';
+    document.getElementById('clockAr').innerText = h12Str + ':' + minutes;
+    document.getElementById('ampmAr').innerText = ampmAr;
+    
+    var ampmEn = hours >= 12 ? 'PM' : 'AM';
+    document.getElementById('clockEn').innerText = h12Str + ':' + minutes;
+    document.getElementById('ampmEn').innerText = ampmEn;
+    
+    document.getElementById('clock24').innerHTML = 
+        String(hours).padStart(2, '0') + ':' + minutes + '<span class="clock-24-seconds">:' + seconds + '</span>';
+    
+    // تحديث أوقات الصلاة كل دقيقة
+    if (seconds === '00' && prayerTimings) {
+        renderPrayers();
+    }
+}
+
+setInterval(updateClocks, 1000);
+updateClocks();
+
+// ============== اليوم ==============
+function updateDay() {
+    var days = ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
+    document.getElementById('dayName').innerText = days[new Date().getDay()];
+}
+updateDay();
+
+// ============== الميلادي ==============
+function updateMiladi() {
+    var now = new Date();
+    var months = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'];
+    var day = now.getDate();
+    var month = now.getMonth() + 1;
+    var year = now.getFullYear();
+    
+    document.getElementById('miladiWritten').innerText = day + ' ' + months[now.getMonth()] + ' ' + year + ' م';
+    document.getElementById('miladiNumeric').innerText = String(day).padStart(2, '0') + '/' + String(month).padStart(2, '0') + '/' + year;
+}
+updateMiladi();
+
+// ============== الهجري ==============
+async function getHijriDate() {
+    try {
+        var today = new Date();
+        var day = String(today.getDate()).padStart(2, '0');
+        var month = String(today.getMonth() + 1).padStart(2, '0');
+        var year = today.getFullYear();
+        
+        var response = await fetch('https://api.aladhan.com/v1/gToH?date=' + day + '-' + month + '-' + year);
+        var data = await response.json();
+        var hijri = data.data.hijri;
+        
+        document.getElementById('hijriWritten').innerText = hijri.day + ' ' + hijri.month.ar + ' ' + hijri.year + ' هـ';
+        document.getElementById('hijriNumeric').innerText = String(hijri.day).padStart(2, '0') + '/' + String(hijri.month.number).padStart(2, '0') + '/' + hijri.year;
+    } catch (e) {
+        document.getElementById('hijriWritten').innerText = 'خطأ في الاتصال';
+    }
+}
+getHijriDate();
+
+// ============== تحويل 24 لـ 12 ==============
+function to12Hour(time24) {
+    var parts = time24.split(':');
+    var h = parseInt(parts[0]);
+    var m = parts[1];
+    var ampm = h >= 12 ? 'م' : 'ص';
+    var h12 = h % 12 || 12;
+    return { time: h12 + ':' + m, ampm: ampm, full: h12 + ':' + m + ' ' + ampm };
+}
+
+// ============== حساب الوقت المنقضي ==============
+function getTimeAgo(prayerMinutes, currentMinutes) {
+    var diff = currentMinutes - prayerMinutes;
+    if (diff < 0) diff += 24 * 60; // الصلاة من yesterday
+    
+    var hours = Math.floor(diff / 60);
+    var mins = diff % 60;
+    
+    if (hours === 0) return 'منذ ' + mins + ' دقيقة';
+    if (hours === 1) return 'منذ ساعة';
+    if (hours === 2) return 'منذ ساعتين';
+    if (hours <= 10) return 'منذ ' + hours + ' ساعات';
+    return 'منذ ' + hours + ' ساعة';
+}
+
+// ============== حساب الوقت المتبقي ==============
+function getTimeUntil(prayerMinutes, currentMinutes) {
+    var diff = prayerMinutes - currentMinutes;
+    if (diff < 0) diff += 24 * 60;
+    
+    var hours = Math.floor(diff / 60);
+    var mins = diff % 60;
+    
+    if (hours === 0) return 'بعد ' + mins + ' دقيقة';
+    if (hours === 1) return 'بعد ساعة';
+    if (hours === 2) return 'بعد ساعتين';
+    if (hours <= 10) return 'بعد ' + hours + ' ساعات';
+    return 'بعد ' + hours + ' ساعة';
+}
+
+// ============== عرض الصلوات ==============
+function renderPrayers() {
+    if (!prayerTimings) return;
+    
+    var prayers = [
+        {name: 'الفجر', key: 'Fajr'},
+        {name: 'الشروق', key: 'Sunrise'},
+        {name: 'الظهر', key: 'Dhuhr'},
+        {name: 'العصر', key: 'Asr'},
+        {name: 'المغرب', key: 'Maghrib'},
+        {name: 'العشاء', key: 'Isha'}
+    ];
+    
+    var now = new Date();
+    var currentMinutes = now.getHours() * 60 + now.getMinutes();
+    
+    var nextPrayer = null;
+    var nextPrayerTime = null;
+    var nextPrayerMinutes = null;
+    var minDiff = Infinity;
+    
+    var html = '';
+    
+    prayers.forEach(function(p) {
+        var time24 = prayerTimings[p.key];
+        var timeParts = time24.split(':');
+        var prayerMinutes = parseInt(timeParts[0]) * 60 + parseInt(timeParts[1]);
+        var t12 = to12Hour(time24);
+        var diff = prayerMinutes - currentMinutes;
+        
+        var status = '';
+        var statusClass = '';
+        var rowClass = '';
+        
+        if (diff > 0 && diff < minDiff) {
+            minDiff = diff;
+            nextPrayer = p.name;
+            nextPrayerTime = t12.full;
+            nextPrayerMinutes = prayerMinutes;
+        }
+        
+        if (diff <= 0) {
+            // مرت
+            rowClass = 'past';
+            status = getTimeAgo(prayerMinutes, currentMinutes);
+            statusClass = 'past-status';
+        } else if (diff === minDiff) {
+            // القادمة
+            rowClass = 'next';
+            status = getTimeUntil(prayerMinutes, currentMinutes);
+            statusClass = 'next-status';
+        } else {
+            // مستقبلية
+            rowClass = '';
+            status = getTimeUntil(prayerMinutes, currentMinutes);
+            statusClass = '';
+        }
+        
+        html += '<div class="prayer-row ' + rowClass + '">' +
+            '<div class="prayer-info">' +
+            '<div class="prayer-name">' + p.name + '</div>' +
+            '<div class="prayer-status ' + statusClass + '">' + status + '</div>' +
+            '</div>' +
+            '<div class="prayer-time-box">' +
+            '<div class="prayer-time-12">' + t12.time + ' <span style="font-size:14px;color:#8e8e93;">' + t12.ampm + '</span></div>' +
+            '<div class="prayer-time-24">' + time24 + '</div>' +
+            '</div>' +
+            '</div>';
+    });
+    
+    document.getElementById('prayerList').innerHTML = html;
+    
+    // الصلاة القادمة الكبيرة
+    if (nextPrayer) {
+        var countdown = getTimeUntil(nextPrayerMinutes, currentMinutes);
+        document.getElementById('nextPrayerBox').innerHTML = 
+            '<div class="next-prayer-big">' +
+            '<div class="next-prayer-big-label">الصلاة القادمة</div>' +
+            '<div class="next-prayer-big-name">' + nextPrayer + '</div>' +
+            '<div class="next-prayer-big-time">' + nextPrayerTime + '</div>' +
+            '<div class="next-prayer-big-countdown">⏳ ' + countdown + '</div>' +
+            '</div>';
+    }
+}
+
+// ============== الموقع اليدوي ==============
+async function setManualLocation() {
+    var city = document.getElementById('cityInput').value.trim();
+    if (!city) return;
+    
+    document.getElementById('locationDisplay').innerText = 'جاري البحث...';
+    
+    try {
+        var response = await fetch('https://geocoding-api.open-meteo.com/v1/search?name=' + encodeURIComponent(city) + '&count=1&language=ar&format=json');
+        var data = await response.json();
+        
+        if (!data.results || data.results.length === 0) {
+            document.getElementById('locationDisplay').innerText = 'المدينة غير موجودة';
+            return;
+        }
+        
+        var result = data.results[0];
+        currentLat = result.latitude;
+        currentLon = result.longitude;
+        currentCity = result.name + (result.admin1 ? ', ' + result.admin1 : '');
+        
+        document.getElementById('locationDisplay').innerText = '📍 ' + currentCity;
+        
+        getWeather();
+        getPrayerTimes();
+    } catch (e) {
+        document.getElementById('locationDisplay').innerText = 'خطأ في البحث';
+    }
+}
+
+// ============== الموقع GPS ==============
+function setGPSLocation() {
+    document.getElementById('locationDisplay').innerText = 'جاري تحديد الموقع...';
+    
+    if (!navigator.geolocation) {
+        document.getElementById('locationDisplay').innerText = 'GPS غير مدعوم';
+        return;
+    }
+    
+    navigator.geolocation.getCurrentPosition(
+        async function(position) {
+            currentLat = position.coords.latitude;
+            currentLon = position.coords.longitude;
+            currentCity = 'موقعك الحالي';
+            
+            document.getElementById('locationDisplay').innerText = '📡 موقعك الحالي';
+            
+            getWeather();
+            getPrayerTimes();
+        },
+        function() {
+            document.getElementById('locationDisplay').innerText = 'فشل تحديد الموقع';
+        }
+    );
+}
+
+// ============== الطقس ==============
+async function getWeather() {
+    if (!currentLat || !currentLon) return;
+    
+    try {
+        var response = await fetch('https://api.open-meteo.com/v1/forecast?latitude=' + currentLat + '&longitude=' + currentLon + '&current=temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m&daily=temperature_2m_max,temperature_2m_min&timezone=auto');
+        var data = await response.json();
+        var current = data.current;
+        
+        var weatherCodes = {
+            0: {icon: '☀️', desc: 'صافٍ'},
+            1: {icon: '🌤️', desc: 'غائم جزئياً'},
+            2: {icon: '⛅', desc: 'غائم'},
+            3: {icon: '☁️', desc: 'ملبَّد بالغيوم'},
+            45: {icon: '🌫️', desc: 'ضباب'},
+            48: {icon: '🌫️', desc: 'ضباب جامد'},
+            51: {icon: '🌦️', desc: 'رذاذ خفيف'},
+            53: {icon: '🌦️', desc: 'رذاذ'},
+            55: {icon: '🌧️', desc: 'رذاذ كثيف'},
+            61: {icon: '🌧️', desc: 'مطر خفيف'},
+            63: {icon: '🌧️', desc: 'مطر'},
+            65: {icon: '🌧️', desc: 'مطر غزير'},
+            71: {icon: '🌨️', desc: 'ثلج خفيف'},
+            73: {icon: '🌨️', desc: 'ثلج'},
+            75: {icon: '❄️', desc: 'ثلج كثيف'},
+            80: {icon: '🌦️', desc: 'زخات مطر'},
+            81: {icon: '🌧️', desc: 'زخات مطر'},
+            82: {icon: '⛈️', desc: 'زخات غزيرة'},
+            95: {icon: '⛈️', desc: 'عواصف رعدية'},
+            96: {icon: '⛈️', desc: 'عواصف مع برد'},
+            99: {icon: '⛈️', desc: 'عواصف شديدة'}
+        };
+        
+        var w = weatherCodes[current.weather_code] || {icon: '🌡️', desc: '---'};
+        
+        var html = '<div class="weather-main">' +
+            '<div class="weather-temp">' + Math.round(current.temperature_2m) + '°</div>' +
+            '<div class="weather-icon">' + w.icon + '</div>' +
+            '</div>' +
+            '<div class="weather-desc">' + w.desc + '</div>' +
+            '<div class="weather-details">' +
+            '<div class="weather-item"><div class="weather-item-label">الصغرى</div><div class="weather-item-value">' + Math.round(data.daily.temperature_2m_min[0]) + '°</div></div>' +
+            '<div class="weather-item"><div class="weather-item-label">الكبرى</div><div class="weather-item-value">' + Math.round(data.daily.temperature_2m_max[0]) + '°</div></div>' +
+            '<div class="weather-item"><div class="weather-item-label">الرطوبة</div><div class="weather-item-value">' + current.relative_humidity_2m + '%</div></div>' +
+            '<div class="weather-item"><div class="weather-item-label">الرياح</div><div class="weather-item-value">' + current.wind_speed_10m + ' كم/س</div></div>' +
+            '</div>';
+        
+        document.getElementById('weatherContent').innerHTML = html;
+    } catch (e) {
+        document.getElementById('weatherContent').innerHTML = '<div class="error">خطأ في تحميل الطقس</div>';
+    }
+}
+
+// ============== أوقات الصلاة ==============
+async function getPrayerTimes() {
+    if (!currentLat || !currentLon) return;
+    
+    try {
+        var today = new Date();
+        var day = String(today.getDate()).padStart(2, '0');
+        var month = String(today.getMonth() + 1).padStart(2, '0');
+        var year = today.getFullYear();
+        
+        var response = await fetch('https://api.aladhan.com/v1/timings/' + day + '-' + month + '-' + year + '?latitude=' + currentLat + '&longitude=' + currentLon + '&method=4');
+        var data = await response.json();
+        prayerTimings = data.data.timings;
+        
+        renderPrayers();
+    } catch (e) {
+        document.getElementById('prayerList').innerHTML = '<div class="error">خطأ في تحميل أوقات الصلاة</div>';
+    }
+}
+</script>
+</body>
+</html>

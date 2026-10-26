@@ -1,0 +1,61 @@
+/* ═══════════════════════════════════════════════════════════════
+   مملكة القراصنة v2 — Styles
+   (انسخ محتوى style.css القديم هنا)
+   ═══════════════════════════════════════════════════════════════ */
+:root {
+  --hud-bg: rgba(10,25,41,.85);
+  --hud-border: rgba(245,196,94,.35);
+  --gold-1: #ffe9a8; --gold-2: #f5c45e; --gold-3: #b8841f;
+  --sea-1: #0d3a5c; --sea-2: #061826; --sea-3: #020a13;
+  --text: #f2f4f8; --muted: #93a5bb; --danger: #ff8a7a;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { width: 100%; height: 100%; overflow: hidden; background: radial-gradient(ellipse at top, var(--sea-1) 0%, var(--sea-2) 60%, var(--sea-3) 100%); color: var(--text); font-family: 'Cairo', system-ui, sans-serif; }
+.screen { position: fixed; inset: 0; display: none; flex-direction: column; overflow: hidden; }
+.screen.visible { display: flex; }
+.splash-logo { font-family: 'Lalezar'; font-size: 42px; background: linear-gradient(180deg, var(--gold-1), var(--gold-3)); -webkit-background-clip: text; color: transparent; }
+.gold-btn { background: linear-gradient(180deg, var(--gold-1), var(--gold-3)); color: #2a1a05; font-weight: 900; border: 2px solid var(--gold-1); border-radius: 12px; padding: 12px 16px; font-size: 15px; cursor: pointer; }
+.ghost-btn { background: rgba(255,255,255,.08); color: var(--text); border: 1px solid rgba(255,255,255,.2); border-radius: 12px; padding: 12px 16px; font-size: 15px; font-weight: bold; cursor: pointer; }
+.list-item { display: flex; align-items: center; gap: 12px; padding: 14px; background: rgba(255,255,255,.05); border: 1.5px solid var(--hud-border); border-radius: 14px; margin-bottom: 10px; cursor: pointer; }
+.list-item .emoji { font-size: 36px; width: 50px; text-align: center; flex-shrink: 0; }
+.list-item-info { flex: 1; }
+.list-item-name { font-size: 15px; font-weight: bold; }
+.list-item-desc { font-size: 12px; color: var(--muted); }
+.list-item-price { font-size: 13px; font-weight: bold; color: var(--gold-2); margin-top: 4px; }
+.empty { grid-column: 1/-1; text-align: center; color: var(--muted); padding: 40px 20px; font-size: 14px; }
+#toast { position: fixed; left: 50%; bottom: 95px; transform: translateX(-50%); z-index: 2000; background: rgba(10,25,41,.95); border: 1.5px solid var(--gold-2); color: var(--gold-2); padding: 12px 22px; border-radius: 24px; font-size: 14px; font-weight: bold; opacity: 0; transition: opacity .25s; pointer-events: none; max-width: 84%; text-align: center; }
+#toast.show { opacity: 1; }
+#overlay { position: fixed; inset: 0; z-index: 900; background: rgba(0,0,0,.6); display: none; align-items: center; justify-content: center; padding: 16px; }
+#overlay.show { display: flex; }
+.modal { background: linear-gradient(180deg, #0e2238, #06182b); border: 1.5px solid var(--hud-border); border-radius: 20px; padding: 20px; max-width: 340px; width: 100%; }
+.modal-title { font-family: 'Lalezar'; font-size: 22px; text-align: center; color: var(--gold-2); margin-bottom: 8px; }
+.modal-sub { color: var(--muted); font-size: 13px; text-align: center; margin-bottom: 14px; }
+.modal-btns { display: flex; gap: 10px; margin-top: 14px; }
+.modal-btns > * { flex: 1; }
+.inner-header { display: flex; align-items: center; gap: 12px; padding: 12px 14px; background: var(--hud-bg); border-bottom: 1.5px solid var(--hud-border); }
+.inner-back { width: 40px; height: 40px; border-radius: 12px; background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.2); color: var(--text); font-size: 18px; cursor: pointer; }
+.inner-title { flex: 1; font-family: 'Lalezar'; font-size: 22px; color: var(--gold-2); }
+.inner-body { flex: 1; overflow-y: auto; padding: 14px; }
+.tabs { display: flex; gap: 8px; margin-bottom: 14px; overflow-x: auto; }
+.chip { padding: 10px 12px; border-radius: 12px; background: rgba(255,255,255,.05); border: 1.5px solid rgba(255,255,255,.15); color: var(--muted); font-weight: bold; font-size: 13px; cursor: pointer; }
+.chip.active { background: linear-gradient(180deg, var(--gold-2), var(--gold-3)); color: #2a1a05; }
+#splash { position: fixed; inset: 0; z-index: 99999; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 22px; background: radial-gradient(ellipse at center, var(--sea-1), var(--sea-3)); transition: opacity .5s; }
+#splash.hide { opacity: 0; pointer-events: none; }
+#tutorial { position: fixed; inset: 0; z-index: 9000; display: none; flex-direction: column; align-items: center; justify-content: center; padding: 22px; background: rgba(2,10,19,.94); text-align: center; }
+#tutorial.show { display: flex; }
+.tut-icon { font-size: 64px; margin-bottom: 16px; }
+.tut-title { font-family: 'Lalezar'; font-size: 30px; color: var(--gold-2); margin-bottom: 10px; }
+.tut-text { font-size: 15px; line-height: 1.7; margin-bottom: 22px; color: var(--muted); }
+.text-input { width: 100%; padding: 14px; border-radius: 12px; border: 1.5px solid var(--hud-border); background: rgba(0,0,0,.5); color: #fff; font-size: 16px; text-align: center; margin-top: 6px; }
+#oceanCanvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+#topHud { position: absolute; top: 0; left: 0; right: 0; z-index: 100; padding: 20px 12px 8px; display: flex; flex-direction: column; gap: 6px; }
+#topRow1 { display: flex; align-items: center; gap: 10px; }
+.profile-box { width: 52px; height: 52px; border-radius: 50%; background: rgba(255,255,255,.1); border: 2px solid rgba(255,255,255,.4); display: flex; align-items: center; justify-content: center; font-size: 24px; cursor: pointer; }
+#topRow2 { display: flex; align-items: center; gap: 10px; justify-content: center; flex-wrap: wrap; }
+.hud-counter { display: flex; align-items: center; gap: 5px; cursor: pointer; }
+.hud-counter-box { background: #050200; border-radius: 4px; padding: 2px 8px; min-width: 50px; height: 22px; display: flex; align-items: center; justify-content: center; }
+.hud-counter-val { font-family: 'Lalezar'; font-size: 15px; color: var(--gold-1); }
+.hud-gift { cursor: pointer; font-size: 26px; }
+#bottomNav { position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%); z-index: 100; display: flex; gap: 6px; padding: 8px; background: var(--hud-bg); border: 1.5px solid var(--hud-border); border-radius: 20px; }
+.nav-btn { width: 50px; height: 50px; border: none; border-radius: 14px; background: rgba(255,255,255,.04); font-size: 24px; cursor: pointer; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); gap: 12px; }

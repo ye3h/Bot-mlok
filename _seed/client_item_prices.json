@@ -1,0 +1,638 @@
+[
+  {
+    "item_type": "frame",
+    "item_id": "af_bronze",
+    "price_coins": 0,
+    "price_gems": 350
+  },
+  {
+    "item_type": "frame",
+    "item_id": "af_silver",
+    "price_coins": 0,
+    "price_gems": 1400
+  },
+  {
+    "item_type": "frame",
+    "item_id": "af_gold",
+    "price_coins": 0,
+    "price_gems": 4200
+  },
+  {
+    "item_type": "frame",
+    "item_id": "af_emerald",
+    "price_coins": 0,
+    "price_gems": 6300
+  },
+  {
+    "item_type": "frame",
+    "item_id": "af_ruby",
+    "price_coins": 0,
+    "price_gems": 12600
+  },
+  {
+    "item_type": "frame",
+    "item_id": "af_diamond",
+    "price_coins": 0,
+    "price_gems": 31500
+  },
+  {
+    "item_type": "frame",
+    "item_id": "af_dragon",
+    "price_coins": 0,
+    "price_gems": 63000
+  },
+  {
+    "item_type": "frame",
+    "item_id": "af_imperial",
+    "price_coins": 0,
+    "price_gems": 140000
+  },
+  {
+    "item_type": "frame",
+    "item_id": "nf_simple",
+    "price_coins": 0,
+    "price_gems": 210
+  },
+  {
+    "item_type": "frame",
+    "item_id": "nf_sky",
+    "price_coins": 0,
+    "price_gems": 1050
+  },
+  {
+    "item_type": "frame",
+    "item_id": "nf_gold",
+    "price_coins": 0,
+    "price_gems": 3500
+  },
+  {
+    "item_type": "frame",
+    "item_id": "nf_emerald",
+    "price_coins": 0,
+    "price_gems": 5600
+  },
+  {
+    "item_type": "frame",
+    "item_id": "nf_royal",
+    "price_coins": 0,
+    "price_gems": 15400
+  },
+  {
+    "item_type": "frame",
+    "item_id": "nf_legend",
+    "price_coins": 0,
+    "price_gems": 42000
+  },
+  {
+    "item_type": "frame",
+    "item_id": "nf_inferno",
+    "price_coins": 0,
+    "price_gems": 56000
+  },
+  {
+    "item_type": "frame",
+    "item_id": "nf_abyss",
+    "price_coins": 0,
+    "price_gems": 70000
+  },
+  {
+    "item_type": "frame",
+    "item_id": "af_aries",
+    "price_coins": 0,
+    "price_gems": 700
+  },
+  {
+    "item_type": "frame",
+    "item_id": "af_lux_aurora",
+    "price_coins": 0,
+    "price_gems": 30000
+  },
+  {
+    "item_type": "name_frame",
+    "item_id": "nf_aries",
+    "price_coins": 0,
+    "price_gems": 700
+  },
+  {
+    "item_type": "bubble_frame",
+    "item_id": "bf_aries",
+    "price_coins": 0,
+    "price_gems": 700
+  },
+  {
+    "item_type": "profile_frame",
+    "item_id": "pf_aries",
+    "price_coins": 0,
+    "price_gems": 700
+  },
+  {
+    "item_type": "frame",
+    "item_id": "af_phoenix",
+    "price_coins": 0,
+    "price_gems": 3500
+  },
+  {
+    "item_type": "name_frame",
+    "item_id": "nf_phoenix",
+    "price_coins": 0,
+    "price_gems": 3500
+  },
+  {
+    "item_type": "bubble_frame",
+    "item_id": "bf_phoenix",
+    "price_coins": 0,
+    "price_gems": 3500
+  },
+  {
+    "item_type": "profile_frame",
+    "item_id": "pf_phoenix",
+    "price_coins": 0,
+    "price_gems": 3500
+  },
+  {
+    "item_type": "frame",
+    "item_id": "af_virgo",
+    "price_coins": 0,
+    "price_gems": 5600
+  },
+  {
+    "item_type": "name_frame",
+    "item_id": "nf_virgo",
+    "price_coins": 0,
+    "price_gems": 5600
+  },
+  {
+    "item_type": "bubble_frame",
+    "item_id": "bf_virgo",
+    "price_coins": 0,
+    "price_gems": 5600
+  },
+  {
+    "item_type": "profile_frame",
+    "item_id": "pf_virgo",
+    "price_coins": 0,
+    "price_gems": 5600
+  },
+  {
+    "item_type": "frame",
+    "item_id": "af_leo",
+    "price_coins": 0,
+    "price_gems": 8400
+  },
+  {
+    "item_type": "weapon",
+    "item_id": "rocket_small",
+    "price_coins": 1500,
+    "price_gems": 0
+  },
+  {
+    "item_type": "weapon",
+    "item_id": "rocket_medium",
+    "price_coins": 15000,
+    "price_gems": 0
+  },
+  {
+    "item_type": "weapon",
+    "item_id": "rocket_large",
+    "price_coins": 90000,
+    "price_gems": 0
+  },
+  {
+    "item_type": "weapon",
+    "item_id": "nuke",
+    "price_coins": 0,
+    "price_gems": 100
+  },
+  {
+    "item_type": "crew",
+    "item_id": "guide",
+    "price_coins": 600000,
+    "price_gems": 0
+  },
+  {
+    "item_type": "crew",
+    "item_id": "sailor",
+    "price_coins": 600000,
+    "price_gems": 0
+  },
+  {
+    "item_type": "crew",
+    "item_id": "fixer_1",
+    "price_coins": 200000,
+    "price_gems": 0
+  },
+  {
+    "item_type": "crew",
+    "item_id": "fixer_2",
+    "price_coins": 700000,
+    "price_gems": 0
+  },
+  {
+    "item_type": "crew",
+    "item_id": "fixer_3",
+    "price_coins": 3500000,
+    "price_gems": 0
+  },
+  {
+    "item_type": "crew",
+    "item_id": "luck",
+    "price_coins": 0,
+    "price_gems": 30
+  },
+  {
+    "item_type": "crew",
+    "item_id": "thief",
+    "price_coins": 0,
+    "price_gems": 25
+  },
+  {
+    "item_type": "crew",
+    "item_id": "trader",
+    "price_coins": 0,
+    "price_gems": 30
+  },
+  {
+    "item_type": "crew",
+    "item_id": "police",
+    "price_coins": 0,
+    "price_gems": 25
+  },
+  {
+    "item_type": "name_frame",
+    "item_id": "nf_leo",
+    "price_coins": 0,
+    "price_gems": 8400
+  },
+  {
+    "item_type": "weapon",
+    "item_id": "ad_bomb",
+    "price_coins": 0,
+    "price_gems": 180
+  },
+  {
+    "item_type": "crew",
+    "item_id": "market_expert",
+    "price_coins": 0,
+    "price_gems": 1000
+  },
+  {
+    "item_type": "crew",
+    "item_id": "fixer_4",
+    "price_coins": 0,
+    "price_gems": 130
+  },
+  {
+    "item_type": "bubble_frame",
+    "item_id": "bf_leo",
+    "price_coins": 0,
+    "price_gems": 8400
+  },
+  {
+    "item_type": "profile_frame",
+    "item_id": "pf_leo",
+    "price_coins": 0,
+    "price_gems": 8400
+  },
+  {
+    "item_type": "crew",
+    "item_id": "golden_fisher",
+    "price_coins": 0,
+    "price_gems": 1500
+  },
+  {
+    "item_type": "frame",
+    "item_id": "af_taurus",
+    "price_coins": 0,
+    "price_gems": 12600
+  },
+  {
+    "item_type": "name_frame",
+    "item_id": "nf_taurus",
+    "price_coins": 0,
+    "price_gems": 12600
+  },
+  {
+    "item_type": "bubble_frame",
+    "item_id": "bf_taurus",
+    "price_coins": 0,
+    "price_gems": 12600
+  },
+  {
+    "item_type": "profile_frame",
+    "item_id": "pf_taurus",
+    "price_coins": 0,
+    "price_gems": 12600
+  },
+  {
+    "item_type": "frame",
+    "item_id": "af_gemini",
+    "price_coins": 0,
+    "price_gems": 17500
+  },
+  {
+    "item_type": "name_frame",
+    "item_id": "nf_gemini",
+    "price_coins": 0,
+    "price_gems": 17500
+  },
+  {
+    "item_type": "bubble_frame",
+    "item_id": "bf_gemini",
+    "price_coins": 0,
+    "price_gems": 17500
+  },
+  {
+    "item_type": "profile_frame",
+    "item_id": "pf_gemini",
+    "price_coins": 0,
+    "price_gems": 17500
+  },
+  {
+    "item_type": "frame",
+    "item_id": "af_scorpio",
+    "price_coins": 0,
+    "price_gems": 35000
+  },
+  {
+    "item_type": "name_frame",
+    "item_id": "nf_scorpio",
+    "price_coins": 0,
+    "price_gems": 35000
+  },
+  {
+    "item_type": "bubble_frame",
+    "item_id": "bf_scorpio",
+    "price_coins": 0,
+    "price_gems": 35000
+  },
+  {
+    "item_type": "profile_frame",
+    "item_id": "pf_scorpio",
+    "price_coins": 0,
+    "price_gems": 35000
+  },
+  {
+    "item_type": "frame",
+    "item_id": "af_pisces",
+    "price_coins": 0,
+    "price_gems": 52500
+  },
+  {
+    "item_type": "name_frame",
+    "item_id": "nf_pisces",
+    "price_coins": 0,
+    "price_gems": 52500
+  },
+  {
+    "item_type": "bubble_frame",
+    "item_id": "bf_pisces",
+    "price_coins": 0,
+    "price_gems": 52500
+  },
+  {
+    "item_type": "profile_frame",
+    "item_id": "pf_pisces",
+    "price_coins": 0,
+    "price_gems": 52500
+  },
+  {
+    "item_type": "frame",
+    "item_id": "af_lux_neon",
+    "price_coins": 0,
+    "price_gems": 35000
+  },
+  {
+    "item_type": "frame",
+    "item_id": "af_lux_dragon",
+    "price_coins": 0,
+    "price_gems": 45000
+  },
+  {
+    "item_type": "frame",
+    "item_id": "af_lux_celestial",
+    "price_coins": 0,
+    "price_gems": 55000
+  },
+  {
+    "item_type": "frame",
+    "item_id": "af_lux_royal",
+    "price_coins": 0,
+    "price_gems": 65000
+  },
+  {
+    "item_type": "frame",
+    "item_id": "af_lux_diamond",
+    "price_coins": 0,
+    "price_gems": 80000
+  },
+  {
+    "item_type": "frame",
+    "item_id": "af_lux_obsidian",
+    "price_coins": 0,
+    "price_gems": 90000
+  },
+  {
+    "item_type": "frame",
+    "item_id": "af_lux_sakura",
+    "price_coins": 0,
+    "price_gems": 40000
+  },
+  {
+    "item_type": "frame",
+    "item_id": "af_lux_emerald",
+    "price_coins": 0,
+    "price_gems": 70000
+  },
+  {
+    "item_type": "frame",
+    "item_id": "af_lux_imperial",
+    "price_coins": 0,
+    "price_gems": 120000
+  },
+  {
+    "item_type": "name_frame",
+    "item_id": "nf_lux_aurora",
+    "price_coins": 0,
+    "price_gems": 30000
+  },
+  {
+    "item_type": "name_frame",
+    "item_id": "nf_lux_neon",
+    "price_coins": 0,
+    "price_gems": 35000
+  },
+  {
+    "item_type": "name_frame",
+    "item_id": "nf_lux_dragon",
+    "price_coins": 0,
+    "price_gems": 45000
+  },
+  {
+    "item_type": "name_frame",
+    "item_id": "nf_lux_celestial",
+    "price_coins": 0,
+    "price_gems": 55000
+  },
+  {
+    "item_type": "name_frame",
+    "item_id": "nf_lux_royal",
+    "price_coins": 0,
+    "price_gems": 65000
+  },
+  {
+    "item_type": "name_frame",
+    "item_id": "nf_lux_diamond",
+    "price_coins": 0,
+    "price_gems": 80000
+  },
+  {
+    "item_type": "name_frame",
+    "item_id": "nf_lux_obsidian",
+    "price_coins": 0,
+    "price_gems": 90000
+  },
+  {
+    "item_type": "name_frame",
+    "item_id": "nf_lux_sakura",
+    "price_coins": 0,
+    "price_gems": 40000
+  },
+  {
+    "item_type": "name_frame",
+    "item_id": "nf_lux_emerald",
+    "price_coins": 0,
+    "price_gems": 70000
+  },
+  {
+    "item_type": "name_frame",
+    "item_id": "nf_lux_imperial",
+    "price_coins": 0,
+    "price_gems": 120000
+  },
+  {
+    "item_type": "bubble_frame",
+    "item_id": "bf_lux_aurora",
+    "price_coins": 0,
+    "price_gems": 30000
+  },
+  {
+    "item_type": "bubble_frame",
+    "item_id": "bf_lux_neon",
+    "price_coins": 0,
+    "price_gems": 35000
+  },
+  {
+    "item_type": "bubble_frame",
+    "item_id": "bf_lux_dragon",
+    "price_coins": 0,
+    "price_gems": 45000
+  },
+  {
+    "item_type": "bubble_frame",
+    "item_id": "bf_lux_celestial",
+    "price_coins": 0,
+    "price_gems": 55000
+  },
+  {
+    "item_type": "bubble_frame",
+    "item_id": "bf_lux_royal",
+    "price_coins": 0,
+    "price_gems": 65000
+  },
+  {
+    "item_type": "bubble_frame",
+    "item_id": "bf_lux_diamond",
+    "price_coins": 0,
+    "price_gems": 80000
+  },
+  {
+    "item_type": "bubble_frame",
+    "item_id": "bf_lux_obsidian",
+    "price_coins": 0,
+    "price_gems": 90000
+  },
+  {
+    "item_type": "bubble_frame",
+    "item_id": "bf_lux_sakura",
+    "price_coins": 0,
+    "price_gems": 40000
+  },
+  {
+    "item_type": "bubble_frame",
+    "item_id": "bf_lux_emerald",
+    "price_coins": 0,
+    "price_gems": 70000
+  },
+  {
+    "item_type": "bubble_frame",
+    "item_id": "bf_lux_imperial",
+    "price_coins": 0,
+    "price_gems": 120000
+  },
+  {
+    "item_type": "profile_frame",
+    "item_id": "pf_lux_aurora",
+    "price_coins": 0,
+    "price_gems": 30000
+  },
+  {
+    "item_type": "profile_frame",
+    "item_id": "pf_lux_neon",
+    "price_coins": 0,
+    "price_gems": 35000
+  },
+  {
+    "item_type": "profile_frame",
+    "item_id": "pf_lux_dragon",
+    "price_coins": 0,
+    "price_gems": 45000
+  },
+  {
+    "item_type": "profile_frame",
+    "item_id": "pf_lux_celestial",
+    "price_coins": 0,
+    "price_gems": 55000
+  },
+  {
+    "item_type": "profile_frame",
+    "item_id": "pf_lux_royal",
+    "price_coins": 0,
+    "price_gems": 65000
+  },
+  {
+    "item_type": "profile_frame",
+    "item_id": "pf_lux_diamond",
+    "price_coins": 0,
+    "price_gems": 80000
+  },
+  {
+    "item_type": "profile_frame",
+    "item_id": "pf_lux_obsidian",
+    "price_coins": 0,
+    "price_gems": 90000
+  },
+  {
+    "item_type": "profile_frame",
+    "item_id": "pf_lux_sakura",
+    "price_coins": 0,
+    "price_gems": 40000
+  },
+  {
+    "item_type": "profile_frame",
+    "item_id": "pf_lux_emerald",
+    "price_coins": 0,
+    "price_gems": 70000
+  },
+  {
+    "item_type": "profile_frame",
+    "item_id": "pf_lux_imperial",
+    "price_coins": 0,
+    "price_gems": 120000
+  },
+  {
+    "item_type": "weapon",
+    "item_id": "kraken_bomb",
+    "price_coins": 0,
+    "price_gems": 10000
+  }
+]

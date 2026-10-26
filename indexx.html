@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>لعبة الصيد المحلية</title>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@600;700&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #0b1329; font-family: 'Cairo', sans-serif; color: #fff; }
+  .screen { width: 100%; height: 100%; position: absolute; top: 0; left: 0; display: none; flex-direction: column; }
+  .screen.visible { display: flex; }
+  
+  /* واجهة اللعبة الرئيسية */
+  #mainScreen { position: relative; width: 100%; height: 100%; background: linear-gradient(180deg, #1a94ff 0%, #0a45a8 50%, #04163f 100%); }
+  
+  .hud {
+    position: absolute; top: 15px; right: 15px; left: 15px;
+    display: flex; justify-content: space-between; align-items: center;
+    background: rgba(0, 0, 0, 0.4); padding: 10px 20px; border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.2); z-index: 100;
+  }
+  .hud-item { font-size: 18px; font-weight: bold; color: #ffd700; display: flex; align-items: center; gap: 8px; }
+
+  .game-container {
+    position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+    text-align: center;
+  }
+  .btn {
+    background: linear-gradient(135deg, #f0c060, #c8920a); color: #111;
+    border: none; padding: 14px 28px; font-size: 18px; font-weight: bold;
+    border-radius: 12px; cursor: pointer; transition: transform 0.1s, filter 0.2s;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.3); font-family: 'Cairo', sans-serif;
+    margin: 10px;
+  }
+  .btn:active { transform: scale(0.95); filter: brightness(0.9); }
+  
+  .panel {
+    background: rgba(15, 25, 55, 0.95); border: 2px solid #c8920a;
+    border-radius: 16px; padding: 25px; width: 90%; max-width: 400px;
+    margin: auto; box-shadow: 0 8px 30px rgba(0,0,0,0.6); text-align: center;
+  }
+  .panel h2 { color: #ffd700; margin-bottom: 15px; }
+  .fish-display { font-size: 60px; margin: 20px 0; }
+</style>
+</head>
+<body>
+
+<!-- الشاشة الرئيسية للعبة -->
+<div id="mainScreen" class="screen visible">
+  <div class="hud">
+    <div class="hud-item">💰 الذهب: <span id="coinCount">5000</span></div>
+    <div class="hud-item">🐟 الأسماك: <span id="fishCount">0</span></div>
+  </div>
+
+  <div class="game-container">
+    <h1 style="margin-bottom: 20px; text-shadow: 0 2px 10px rgba(0,0,0,0.5);">لعبة الصيد المحليات</h1>
+    <button class="btn" onclick="startFishing()">🎣 ابدأ الصيد الآن</button>
+    <br>
+    <button class="btn" style="background: linear-gradient(135deg, #4a90e2, #2c3e50); color: #fff;" onclick="openWarehouse()">📦 المخزن والسوق</button>
+  </div>
+</div>
+
+<!-- شاشة المخزن -->
+<div id="warehouseScreen" class="screen" style="justify-content: center; align-items: center; background: #0f1937;">
+  <div class="panel">
+    <h2>المخزن</h2>
+    <div class="fish-display">🐟</div>
+    <p>عدد الأسماك المحفوظة: <span id="whFishCount">0</span></p>
+    <p style="margin: 10px 0; color: #ffd700;">قيمة البيع: <span id="whFishValue">0</span> ذهبة</p>
+    <button class="btn" onclick="sellAllFish()">بيع كل الأسماك</button>
+    <br><br>
+    <button class="btn" style="background: #555; color: #fff;" onclick="showScreen('mainScreen')">العودة للرئيسية</button>
+  </div>
+</div>
+
+<script>
+  // بيانات اللعبة المحلية الافتراضية
+  let gameState = {
+    coins: 5000,
+    fish: 0,
+    sardines: 10
+  };
+
+  // استرجاع البيانات عند فتح الصفحة
+  function loadLocalData() {
+    const saved = localStorage.getItem('local_fishing_game_db');
+    if (saved) {
+      try {
+        gameState = JSON.parse(saved);
+      } catch (e) {
+        console.error("خطأ في قراءة البيانات المحلية");
+      }
+    }
+    updateHUD();
+  }
+
+  // حفظ البيانات محلياً
+  function saveLocalData() {
+    localStorage.setItem('local_fishing_game_db', JSON.stringify(gameState));
+    updateHUD();
+  }
+
+  // تحديث الواجهة
+  function updateHUD() {
+    document.getElementById('coinCount').textContent = gameState.coins.toLocaleString();
+    document.getElementById('fishCount').textContent = gameState.fish;
+    document.getElementById('whFishCount').textContent = gameState.fish;
+    document.getElementById('whFishValue').textContent = (gameState.fish * 50).toLocaleString();
+  }
+
+  // التنقل بين الشاشات
+  function showScreen(screenId) {
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('visible'));
+    document.getElementById(screenId).classList.add('visible');
+  }
+
+  // عملية الصيد
+  function startFishing() {
+    gameState.fish += Math.floor(Math.random() * 3) + 1; // صيد من 1 إلى 3 سمكات عشوائياً
+    saveLocalData();
+    alert('مبروك! لقد صطدت سمكة جديدة 🎣');
+  }
+
+  // فتح المخزن
+  function openWarehouse() {
+    showScreen('warehouseScreen');
+  }
+
+  // بيع الأسماك
+  function sellAllFish() {
+    if (gameState.fish <= 0) {
+      alert('لا توجد أسماك للبيع في المخزن!');
+      return;
+    }
+    const earnings = gameState.fish * 50;
+    gameState.coins += earnings;
+    gameState.fish = 0;
+    saveLocalData();
+    alert(`تم بيع الأسماك بنجاح مقابل ${earnings} ذهبة! 💰`);
+  }
+
+  // تشغيل التحميل المحلي عند بدء التشغيل
+  window.onload = function() {
+    loadLocalData();
+  };
+</script>
+
+</body>
+</html>
