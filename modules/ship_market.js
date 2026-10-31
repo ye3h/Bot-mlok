@@ -1,6 +1,6 @@
-// modules/ship_market.js — سوق السفن (v4.0.1)
+// modules/ship_market.js — سوق السفن (v4.0.2 - متوافق ومحدث)
 ModuleRegistry.register({
-  id: 'ship_market', name: 'سوق السفن', version: '4.0.1', dependencies: [],
+  id: 'ship_market', name: 'سوق السفن', version: '4.0.2', dependencies: [],
   ctx: null, selected: null, _isOpen: false, _lastTick: 0,
   IN_SHOP_ONLY: { 'phoenix':1, 'dragon-t1':1, 'dragon-t2':1, 'dragon-t3':1, 'submarine':1 },
   SHIP_FLAVOR: {
@@ -10,13 +10,13 @@ ModuleRegistry.register({
     'ship-lvl-4': 'سفينة بمجاديف قوية — أولى خطواتك الحقيقية نحو الأعماق.',
     'ship-lvl-5': 'يخت أبيض أنيق بمحرك هادئ — رمز الطبقة الوسطى.',
     'ship-lvl-6': 'قارب حربي مدرّع — لمواجهة القراصنة في المياه الخطرة.',
-    'ship-lvl-7': 'سفينة كمين شبحية تنقضّ على فرائسها من حيث لا تراها.',
+    'ship-lvl-7': 'سفينة كمين شبحية تنقضّ على فريستها من حيث لا تراها.',
     'ship-lvl-8': 'حفّارة بحرية ثقيلة تجرف أمواج البحر بلا رحمة.',
     'ship-lvl-9': 'باخرة ضخمة بمداخن بخار ومستودعات واسعة — تنقل صيداً وفيراً.',
     'ship-lvl-10': 'سفينة أبحاث علمية بأجهزة سونار متقدمة — تصطاد ما لا يراه الآخرون.',
     'ship-lvl-11': 'سفينة بفوانيس متوهجة تجذب كائنات الأعماق إليها.',
     'ship-lvl-12': 'سفينة احتفالية مزخرفة بأضواء وأشرعة فاخرة.',
-    'ship-lvl-13': 'سفينة سريعة كالصقر — تنقضّ على الفرائس قبل أن تهرب.',
+    'ship-lvl-13': 'سفينة سريعة كالصقر — تنقضّ على الفريسة قبل أن تهرب.',
     'ship-lvl-14': 'سفينة أعماق متخصصة بالنزول لقاع المحيط — حيث لا يصل أحد.',
     'ship-lvl-15': 'سفينة تشق العواصف بلا خوف — ملكة الأمواج الهادئة.',
     'ship-lvl-16': 'سفينة شبحية سوداء تثير الرعب في قلوب الأعداء.',
@@ -25,7 +25,7 @@ ModuleRegistry.register({
     'ship-lvl-19': 'سفينة جبّارة بهيكل فولاذي ضخم — قلعة عائمة.',
     'ship-lvl-20': 'سفينة مظلمة كموجة الليل — تظهر وتختفي في لمح البصر.',
     'ship-lvl-21': 'سفينة فاتحة للأقاليم البحرية النائية.',
-    'ship-lvl-22': 'سفينة تتلألأ كنجم يهتدي به البحّارة في الظلام.',
+    'ship-lvl-22': 'سفينة تتألأل كنجم يهتدي به البحّارة في الظلام.',
     'ship-lvl-23': 'سفينة الأسطورة التي تجوب أعمق الأعماق المظلمة.',
     'ship-lvl-24': 'سفينة نهائية تصل لحدود المحيط البعيد.',
     'ship-lvl-25': 'عرش بحري ملكي للقباطنة الأسطوريين.',
@@ -71,14 +71,16 @@ ModuleRegistry.register({
     if (act === 'storage') { this.openStorage(); return; }
   },
   openStorage: function () {
-  var f = window.ModuleRegistry && window.ModuleRegistry.get('fleet');
-  if (f && typeof f.openStorage === 'function') { f.openStorage(); return; }
-  this.ctx.ui.toast('موديول الأسطول غير محمّل');
-},
+    var s = window.ModuleRegistry && window.ModuleRegistry.get('ship_storage');
+    if (s && typeof s.open === 'function') { s.open(); return; }
+    var f = window.ModuleRegistry && window.ModuleRegistry.get('fleet');
+    if (f && typeof f.openStorage === 'function') { f.openStorage(); return; }
+    this.ctx.ui.toast('⚠️ موديول المخزن غير محمل');
+  },
   buy: function (code) {
     var def = SHIP_BY_CODE[code]; if (!def) return;
     var fleet = window.shipsUtils.fleetCount(); var stor = window.shipsUtils.storageCount(); var cap = window.shipsUtils.storageCapacity();
-    if (fleet >= 3 && stor >= cap) { this.ctx.ui.toast('🚫 الأسطول والمخزن ممتلئان'); return; }
+    if (fleet >= 3 && stor >= cap) { this.ctx.ui.toast('🚫 الأسطول والمخزن ممتليئان'); return; }
     var res = window.rpcShips('buy_ship_by_code', { _code: code, _template_id: 0, _price_coins: def.price, _max_hp: def.hp });
     if (res.error) { if (/market_level_required/.test(res.error.message)) { this.ctx.ui.toast('🔒 يتطلب مستوى السوق ' + def.level); return; } if (res.error.message === 'no_coins') { this.ctx.ui.toast('💰 الذهب غير كافٍ'); return; } this.ctx.ui.toast('❌ ' + res.error.message); return; }
     this.ctx.ui.toast('✅ اشتريت ' + def.name); if (typeof beep === 'function') beep(780, 0.1); this.render();
@@ -89,7 +91,7 @@ ModuleRegistry.register({
     this.ctx.ui.confirm('ترقية السوق إلى المستوى ' + ((m.level || 1) + 1) + '؟\n' + 'التكلفة: ' + cost.cost_coins.toLocaleString() + ' 💰\nالمدة: ' + mins + ' دقيقة', function () {
       var res = window.rpcShips('market_start_upgrade');
       if (res.error) { var em = res.error.message; if (em === 'no_coins') { self.ctx.ui.toast('💰 الذهب غير كافٍ'); return; } if (em === 'max_level') { self.ctx.ui.toast('وصلت الحد الأقصى'); return; } if (em === 'fish_market_required') { self.ctx.ui.toast('🐟 لازم سوق السمك مستوى ' + res.error.required); return; } if (em === 'upgrade_in_progress') { self.ctx.ui.toast('⏳ ترقية جارية'); return; } self.ctx.ui.toast('❌ ' + em); return; }
-      self.ctx.ui.toast('⏳ بدأت الترقية'); self.render();
+      self.ctx.ui.toast('⏳ بدأَت الترقية'); self.render();
     });
   },
   boostUpgrade: function () {
@@ -115,7 +117,7 @@ ModuleRegistry.register({
     return h;
   },
   _renderFeatured: function (s, m, ownedCount) {
-    var r = shipRarity(s.rarity); var glowMap = { common: 'rgba(156,163,175,.2)', rare: 'rgba(56,189,248,.35)', epic: 'rgba(168,85,247,.45)', legendary: 'rgba(251,191,36,.55)', mythic: 'rgba(244,63,94,.55)', uncommon: 'rgba(16,185,129,.3)' };
+    var r = shipRarity(s.rarity); var glowMap = { common: 'rgba(156,163,175,.2)', rare: 'rgba(56,189,248,.35)', epic: 'rgba(168,85,247,.45)', legendary: 'rgba(251,191,36,.55)', mythic: 'rgba(244,63,94,.55)', uncommon: 'rgba(10,185,129,.3)' };
     var glow = glowMap[s.rarity] || glowMap.common; var locked = (m.level || 1) < s.level; var isShiny = s.rarity === 'legendary' || s.rarity === 'mythic'; var h = '';
     h += '<div style="position:relative;padding:14px;border-radius:18px;background:linear-gradient(180deg,rgba(30,45,75,.95),rgba(10,18,35,.98));border:1.5px solid ' + r.ring + ';margin-bottom:12px;overflow:hidden;box-shadow:0 0 28px ' + glow + ', inset 0 1px 0 rgba(255,255,255,.06)">';
     if (isShiny) { h += '<div style="position:absolute;inset:0;pointer-events:none;background:linear-gradient(120deg, transparent 30%, rgba(255,255,255,.08) 50%, transparent 70%);animation:sm-shine 3.5s linear infinite"></div>'; }

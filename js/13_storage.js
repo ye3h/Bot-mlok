@@ -1,9 +1,24 @@
 'use strict';
-/* ════════════ المخزن الشخصي (v5.2.0) ════════════
-   الأقسام: طواقم / أسلحة / دروع / مضادات / خلفيات
-   ═════════════════════════════════════════════════════════ */
+/* ════════════ المخزن الشخصي وسفن الأسطول (v5.3.0) ════════════ */
 
 var _storageTab = 'crews';
+
+// تسجيل الموديول ليكون متوافقاً مع سوق السفن وباقي الأزرار
+if (typeof ModuleRegistry !== 'undefined') {
+  ModuleRegistry.register({
+    id: 'ship_storage',
+    name: 'مخزن السفن والمخزن',
+    version: '5.3.0',
+    init: function(ctx) {
+      this.ctx = ctx;
+    },
+    open: function() {
+      if (typeof openPersonalStorage === 'function') {
+        openPersonalStorage();
+      }
+    }
+  });
+}
 
 // ═══ دوال مساعدة (fallback) ═══
 if (typeof window.baseOf !== 'function') {
@@ -173,7 +188,13 @@ function stEsc(s) {
 // ═══ بناء الشاشة مرة وحدة ═══
 function stBuildShell() {
   var sec = document.getElementById('screen-storage');
-  if (!sec) return null;
+  if (!sec) {
+    sec = document.createElement('section');
+    sec.className = 'screen';
+    sec.id = 'screen-storage';
+    var app = document.getElementById('app');
+    if (app) app.appendChild(sec);
+  }
   if (document.getElementById('stBody')) return sec;
 
   var tabsHtml = '';
@@ -276,20 +297,27 @@ function renderStorageItems(body, items, sectionId) {
 function openPersonalStorage() {
   var sec = stBuildShell();
   if (!sec) return;
-  document.querySelectorAll('.screen.open').forEach(function (s) {
-    if (s !== sec) s.classList.remove('open');
-  });
+  if (typeof openScreen === 'function') {
+    openScreen('storage');
+  } else {
+    document.querySelectorAll('.screen.open').forEach(function (s) {
+      if (s !== sec) s.classList.remove('open');
+    });
+    sec.classList.add('open');
+  }
   renderStorage();
-  sec.classList.add('open');
 }
 
 function closePersonalStorage() {
-  var sec = document.getElementById('screen-storage');
-  if (sec) sec.classList.remove('open');
+  if (typeof closeScreen === 'function') {
+    closeScreen();
+  } else {
+    var sec = document.getElementById('screen-storage');
+    if (sec) sec.classList.remove('open');
+  }
 }
 
 // ═══ ربط زر "مخزن" ═══
-// pointerdown + click معاً، والتكرار يُمنع بفاصل زمني قصير
 (function () {
   var lastOpen = 0;
   function handle(e) {
@@ -304,32 +332,4 @@ function closePersonalStorage() {
   }
   document.addEventListener('pointerdown', handle, true);
   document.addEventListener('click', handle, true);
-})();
-// ═══ تشخيص مؤقت لزر المخزن ═══
-(function () {
-  setTimeout(function () {
-    var btn = document.querySelector('.nav-btn[data-screen="storage"]');
-    btn && btn.addEventListener('click', function () {
-      var s = document.getElementById('screen-storage');
-      var info = [];
-      info.push('exists=' + !!s);
-      info.push('class=' + (s ? s.className : '-'));
-      info.push('openFn=' + typeof openPersonalStorage);
-      info.push('parent=' + (s && s.parentNode ? s.parentNode.id : '-'));
-      try {
-        openPersonalStorage();
-        info.push('afterClass=' + (s ? s.className : '-'));
-        var r = s ? s.getBoundingClientRect() : null;
-        info.push('rect=' + (r ? Math.round(r.top) + ',' + Math.round(r.height) : '-'));
-      } catch (err) {
-        info.push('ERR=' + err.message);
-      }
-      var box = document.createElement('div');
-      box.style.cssText = 'position:fixed;top:60px;left:8px;right:8px;z-index:99999;background:#000;color:#0f0;' +
-        'font:12px monospace;padding:10px;border:2px solid #0f0;border-radius:8px;direction:ltr;text-align:left;white-space:pre-wrap';
-      box.textContent = info.join('\n');
-      box.onclick = function () { box.remove(); };
-      document.body.appendChild(box);
-    }, true);
-  }, 1000);
 })();
